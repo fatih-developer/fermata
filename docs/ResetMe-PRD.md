@@ -1112,10 +1112,17 @@ Information
 CLI:
 
 ```bash
-resetme logs
+resetme logs [-n N] [--json] [--path]
 ```
 
-ileriki sürümde eklenebilir.
+**Uygulama (MVP-1):**
+
+- Dosya: `<veri dizini>/logs/resetme-YYYY-MM-DD.log`, satır başına bir JSON nesnesi (`ts`, `level`, `category`, `event`, `msg`, `props`, `exception`).
+- Saklama: `[logging] retention_days` (varsayılan 14). Günlük dosya üst sınırı 20 MB.
+- Birden fazla ResetMe süreci aynı dosyaya güvenli şekilde yazabilir (kısa, kilitli ekleme ve yeniden deneme).
+- Tüm metinler §28 gereği `LogSanitizer`'dan geçer (e-posta, Bearer, JWT, `sk-` ve `gh*_` anahtarları, `token=`/`password:` atamaları).
+- Codex isteklerinin parametreleri ve yanıtları loglanmaz. Yalnızca metod adı, süre ve hata loglanır.
+- Olay ID aralıkları: 1–3 CLI, 1xx reset, 2xx monitör, 3xx Codex entegrasyonu.
 
 ---
 

@@ -7,7 +7,7 @@ Codex'in 5 saatlik veya haftalık kullanım limiti dolduğunda bunu tespit eden 
 
 ## Durum
 
-MVP-1 geliştirme aşamasında. Hazır olanlar: `status`, `watch`, `reset`, `doctor`, `config`. Sıradaki: dosyaya loglama, ardından MVP-2 (arka plan servisi, bildirimler).
+MVP-1 komutları hazır: `status`, `watch`, `reset`, `doctor`, `config`, `logs`. Sıradaki: MVP-2 (arka plan servisi, yerel bildirimler, tray).
 
 ## Gereksinimler
 
@@ -23,11 +23,14 @@ dotnet run --project src/ResetMe.Cli -- status --json
 dotnet run --project src/ResetMe.Cli -- doctor
 dotnet run --project src/ResetMe.Cli -- config --init
 dotnet run --project src/ResetMe.Cli -- reset          # onay ister
+dotnet run --project src/ResetMe.Cli -- logs -n 100    # son log kayıtları (--json, --path)
 ```
 
 `watch` her limit olayı için en fazla bir kez sorar. "Hayır" derseniz aynı limit için tekrar sormaz. Soru beklerken izleme duraklar. `mode = "automatic"` ayarıyla onay istemeden reset yapar; günlük ve haftalık sınırlar ile cooldown geçerlidir.
 
 `reset` yalnızca Codex gerçekten limitteyken kredi kullanır. Limit 15 dakikadan kısa sürede kendiliğinden açılacaksa teklif etmez (`--force` ile geçilebilir).
+
+Loglar veri dizinindeki `logs/resetme-YYYY-MM-DD.log` dosyalarına JSON satırları olarak yazılır. Varsayılan saklama süresi 14 gündür, seviye `[logging]` bölümünden ayarlanır. E-posta adresleri, token'lar, JWT'ler ve API key'ler yazılmadan önce temizlenir.
 
 Veri dizini: `%APPDATA%\ResetMe` (Windows), `~/Library/Application Support/ResetMe` (macOS), `~/.config/resetme` (Linux). `RESETME_HOME` ile değiştirilebilir.
 

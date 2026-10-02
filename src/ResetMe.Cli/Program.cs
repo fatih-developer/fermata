@@ -1,5 +1,7 @@
 using System.CommandLine;
 using System.Text;
+using Microsoft.Extensions.Logging;
+using ResetMe.Cli;
 using ResetMe.Cli.Commands;
 using ResetMe.Codex.AppServer;
 using ResetMe.Codex.JsonRpc;
@@ -11,24 +13,28 @@ var root = new RootCommand("ResetMe — watches Codex usage limits and redeems r
 
 var json = new Option<bool>("--json") { Description = "Machine-readable output." };
 var status = new Command("status", "Show 5-hour/weekly usage, reset credits and what can be done.") { json };
-status.SetAction((parse, ct) => Guarded(() => StatusCommand.RunAsync(parse.GetValue(json), ct)));
+status.SetAction((parse, ct) => Guarded("status", () => StatusCommand.RunAsync(parse.GetValue(json), ct)));
 
 var yes = new Option<bool>("--yes", "-y") { Description = "Do not ask for confirmation." };
 var force = new Option<bool>("--force") { Description = "Reset even if the limit lifts soon, the episode was already handled, or the cooldown is active." };
 var verbose = new Option<bool>("--verbose", "-v") { Description = "Print state transitions and the raw outcome." };
 var reset = new Command("reset", "Redeem one reset credit when Codex is rate-limited.") { yes, force, verbose };
-reset.SetAction((parse, ct) => Guarded(() => ResetCommand.RunAsync(
+reset.SetAction((parse, ct) => Guarded("reset", () => ResetCommand.RunAsync(
     parse.GetValue(yes), parse.GetValue(force), parse.GetValue(verbose), ct)));
 
 var watch = new Command("watch", "Monitor usage and offer a reset when a limit is reached (Ctrl+C to stop).");
-watch.SetAction((_, ct) => Guarded(() => WatchCommand.RunAsync(ct)));
+watch.SetAction((_, ct) => Guarded("watch", () => WatchCommand.RunAsync(ct)));
 
 var doctor = new Command("doctor", "Check installation, Codex connectivity and reset capability.");
-doctor.SetAction((_, ct) => Guarded(() => DoctorCommand.RunAsync(ct)));
+doctor.SetAction((_, ct) => Guarded("doctor", () => DoctorCommand.RunAsync(ct)));
 
 var init = new Option<bool>("--init") { Description = "Create config.toml with defaults if missing." };
 var config = new Command("config", "Show the effective configuration.") { init };
 config.SetAction(parse => ConfigCommand.Run(parse.GetValue(init)));
+
+var tail = new Option<int>("--tail", "-n") { Description = "Number of entries to show.", DefaultValueFactory = _ => 50 };
+var logsJson = new Option<bool>("--json") { Description = "Print raw JSON lines." };
+var logsPath = new Option<bool>("--path") { Description = "Print the log directory and exit." };
 
 root.Subcommands.Add(status);
 root.Subcommands.Add(watch);
@@ -36,42 +42,61 @@ root.Subcommands.Add(reset);
 root.Subcommands.Add(doctor);
 root.Subcommands.Add(config);
 
-return await root.Parse(args).InvokeAsync().ConfigureAwait(false);
+var logs = new Command("logs", "Show recent log entries.") { tail, logsJson, logsPath };
+logs.SetAction(parse => LogsCommand.Run(parse.GetValue(tail), parse.GetValue(logsJson), parse.GetValue(logsPath)));
+root.Subcommands.Add(logs);
 
-static async Task<int> Guarded(Func<Task<int>> action)
+try
 {
+    return await root.Parse(args).InvokeAsync().ConfigureAwait(false);
+}
+finally
+{
+    AppLogging.Shutdown();
+}
+
+static async Task<int> Guarded(string command, Func<Task<int>> action)
+{
+    AppLogging.InitializeFromDefaults();
+    var logger = AppLogging.Factory.CreateLogger("ResetMe.Cli");
+    AppLogging.CommandStarted(logger, command, typeof(Program).Assembly.GetName().Version?.ToString(3) ?? "?", System.Runtime.InteropServices.RuntimeInformation.OSDescription);
+
+    int Fail(Exception ex, string code, string message, int exitCode)
+    {
+        AppLogging.CommandFailed(logger, ex, command, code);
+        Console.Error.WriteLine(message);
+        AppLogging.CommandFinished(logger, command, exitCode);
+        return exitCode;
+    }
+
     try
     {
-        return await action().ConfigureAwait(false);
+        var exitCode = await action().ConfigureAwait(false);
+        AppLogging.CommandFinished(logger, command, exitCode);
+        return exitCode;
     }
     catch (CodexUnavailableException ex)
     {
-        Console.Error.WriteLine($"CODEX_UNAVAILABLE: {ex.Message}");
-        return ExitCodes.CodexUnavailable;
+        return Fail(ex, "CODEX_UNAVAILABLE", $"CODEX_UNAVAILABLE: {ex.Message}", ExitCodes.CodexUnavailable);
     }
     catch (CodexTransientException ex)
     {
-        Console.Error.WriteLine($"CODEX_UNAVAILABLE: {ex.Message}");
-        return ExitCodes.CodexUnavailable;
+        return Fail(ex, "CODEX_UNAVAILABLE", $"CODEX_UNAVAILABLE: {ex.Message}", ExitCodes.CodexUnavailable);
     }
     catch (JsonRpcException ex)
     {
-        Console.Error.WriteLine($"Codex returned an error: {ex.Message}");
-        return ExitCodes.Error;
+        return Fail(ex, "CODEX_ERROR", $"Codex returned an error: {ex.Message}", ExitCodes.Error);
     }
     catch (CodexProtocolException ex)
     {
-        Console.Error.WriteLine($"Unexpected Codex response: {ex.Message}");
-        return ExitCodes.Error;
+        return Fail(ex, "PROTOCOL_ERROR", $"Unexpected Codex response: {ex.Message}", ExitCodes.Error);
     }
     catch (InvalidDataException ex)
     {
-        Console.Error.WriteLine($"State error: {ex.Message}");
-        return ExitCodes.Error;
+        return Fail(ex, "STATE_ERROR", $"State error: {ex.Message}", ExitCodes.Error);
     }
-    catch (OperationCanceledException)
+    catch (OperationCanceledException ex)
     {
-        Console.Error.WriteLine("Cancelled.");
-        return ExitCodes.Error;
+        return Fail(ex, "CANCELLED", "Cancelled.", ExitCodes.Error);
     }
 }

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using ResetMe.Cli.Output;
 using ResetMe.Core.Policies;
 using ResetMe.Core.Reset;
@@ -54,7 +55,7 @@ internal static class ResetCommand
             }
         }
 
-        var manager = new ResetManager(client, runtime.StateStore, runtime.Lock, runtime.Options, TimeProvider.System);
+        var manager = new ResetManager(client, runtime.StateStore, runtime.Lock, runtime.Options, TimeProvider.System, AppLogging.Factory.CreateLogger<ResetManager>());
         if (verbose)
         {
             manager.StateChanged += s => Console.WriteLine($"  → {s}");

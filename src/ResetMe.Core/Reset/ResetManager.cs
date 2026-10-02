@@ -1,4 +1,7 @@
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using ResetMe.Core.Domain;
+using ResetMe.Core.Logging;
 using ResetMe.Core.Policies;
 using ResetMe.Core.Ports;
 
@@ -59,19 +62,22 @@ public sealed class ResetManager
     private readonly IResetLock _lock;
     private readonly GuardOptions _options;
     private readonly TimeProvider _time;
+    private readonly ILogger _logger;
 
     public ResetManager(
         ICodexUsageClient client,
         IResetStateStore store,
         IResetLock resetLock,
         GuardOptions options,
-        TimeProvider time)
+        TimeProvider time,
+        ILogger<ResetManager>? logger = null)
     {
         _client = client;
         _store = store;
         _lock = resetLock;
         _options = options;
         _time = time;
+        _logger = logger ?? NullLogger<ResetManager>.Instance;
     }
 
     public event Action<MonitorState>? StateChanged;
@@ -79,6 +85,19 @@ public sealed class ResetManager
     public async Task<ResetReport> ExecuteAsync(ResetRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        ResetLog.RunStarted(_logger, request.Force, request.Automatic);
+
+        var report = await ExecuteCoreAsync(request, cancellationToken).ConfigureAwait(false);
+        if (report.Outcome is null && report.Status is not (ResetRunStatus.Succeeded or ResetRunStatus.Unconfirmed))
+        {
+            ResetLog.NotAttempted(_logger, report.Status.ToString(), report.NoOfferReason?.ToString() ?? "-");
+        }
+
+        return report;
+    }
+
+    private async Task<ResetReport> ExecuteCoreAsync(ResetRequest request, CancellationToken cancellationToken)
+    {
 
         using var handle = _lock.TryAcquire();
         if (handle is null)
@@ -97,6 +116,7 @@ public sealed class ResetManager
                 return new ResetReport(ResetRunStatus.PendingAttemptNeedsUser, UsageBefore: before);
             }
 
+            ResetLog.Resuming(_logger, pending.IdempotencyKey, pending.StartedAt);
             return await RunAttemptAsync(state, pending, before, null, resumed: true, cancellationToken)
                 .ConfigureAwait(false);
         }
@@ -131,6 +151,7 @@ public sealed class ResetManager
         state.Pending = attempt;
         state.LastAttemptAt = now;
         _store.Save(state);
+        ResetLog.AttemptStarted(_logger, attempt.LimitEventId, attempt.IdempotencyKey, attempt.CreditId ?? "backend-selected");
 
         return await RunAttemptAsync(state, attempt, before, assessment, resumed: false, cancellationToken)
             .ConfigureAwait(false);
@@ -185,6 +206,10 @@ public sealed class ResetManager
         StateChanged?.Invoke(MonitorState.Resetting);
 
         var outcome = await ConsumeWithRetryAsync(attempt, cancellationToken).ConfigureAwait(false);
+        if (outcome is { } known)
+        {
+            ResetLog.ConsumeOutcome(_logger, known.ToString(), attempt.IdempotencyKey);
+        }
 
         switch (outcome)
         {
@@ -205,6 +230,7 @@ public sealed class ResetManager
 
         if (verified)
         {
+            ResetLog.Verified(_logger, after!.FiveHour?.UsedPercent, after.Weekly?.UsedPercent, after.AvailableResetCount);
             Resolve(state, attempt, outcome, ResetRunStatus.Succeeded, markEpisodeHandled: true);
             StateChanged?.Invoke(MonitorState.ResetSucceeded);
             return new ResetReport(ResetRunStatus.Succeeded, outcome, assessment, before, after, attempt.IdempotencyKey, resumed);
@@ -223,6 +249,7 @@ public sealed class ResetManager
             Resolve(state, attempt, outcome, ResetRunStatus.Unconfirmed, markEpisodeHandled: true);
         }
 
+        ResetLog.Unconfirmed(_logger, attempt.IdempotencyKey, outcome?.ToString() ?? "unknown", pendingKept: outcome is null);
         StateChanged?.Invoke(MonitorState.ResetUnconfirmed);
         return new ResetReport(ResetRunStatus.Unconfirmed, outcome, assessment, before, after, attempt.IdempotencyKey, resumed);
     }
@@ -238,13 +265,15 @@ public sealed class ResetManager
                 return await _client.ConsumeResetAsync(attempt.IdempotencyKey, attempt.CreditId, cancellationToken)
                     .ConfigureAwait(false);
             }
-            catch (CodexTransientException) when (i < tries - 1)
+            catch (CodexTransientException ex) when (i < tries - 1)
             {
+                ResetLog.ConsumeRetry(_logger, ex, i + 1, tries);
                 await Task.Delay(TimeSpan.FromSeconds(_options.Reset.ConsumeRetryDelaySeconds), _time, cancellationToken)
                     .ConfigureAwait(false);
             }
-            catch (CodexTransientException)
+            catch (CodexTransientException ex)
             {
+                ResetLog.ConsumeUnknown(_logger, ex, tries);
                 return null;
             }
         }
@@ -269,9 +298,10 @@ public sealed class ResetManager
                     return last;
                 }
             }
-            catch (CodexTransientException)
+            catch (CodexTransientException ex)
             {
                 // Keep polling until the deadline.
+                ResetLog.VerifyReadFailed(_logger, ex);
             }
 
             if (_time.GetUtcNow() >= deadline)

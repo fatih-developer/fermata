@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using System.Globalization;
 using ResetMe.Cli.Output;
 using ResetMe.Codex.AppServer;
@@ -32,15 +33,17 @@ internal static class WatchCommand
 
         var connector = new CodexAppServerConnector(
             new CodexClientOptions { Executable = options.CodexExecutable },
-            TimeProvider.System);
+            TimeProvider.System,
+            AppLogging.Factory.CreateLogger("ResetMe.Codex"));
         var monitor = new RateLimitMonitor(
             connector,
-            client => new ResetManager(client, runtime.StateStore, runtime.Lock, options, TimeProvider.System),
+            client => new ResetManager(client, runtime.StateStore, runtime.Lock, options, TimeProvider.System, AppLogging.Factory.CreateLogger<ResetManager>()),
             runtime.StateStore,
             new ConsoleWatchObserver(options),
             options,
             timing,
-            TimeProvider.System);
+            TimeProvider.System,
+            AppLogging.Factory.CreateLogger<RateLimitMonitor>());
 
         await monitor.RunAsync(cancellationToken).ConfigureAwait(false);
         Console.WriteLine();

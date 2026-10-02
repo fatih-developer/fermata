@@ -20,6 +20,8 @@ public sealed class GuardOptions
 
     public AutomaticOptions Automatic { get; set; } = new();
 
+    public LoggingOptions Logging { get; set; } = new();
+
     public bool NotificationsEnabled { get; set; } = true;
 
     /// <summary>Path to the codex executable; empty means search PATH.</summary>
@@ -60,6 +62,14 @@ public sealed class ResetOptions
     public int ConsumeRetryMax { get; set; } = 3;
 
     public int ConsumeRetryDelaySeconds { get; set; } = 2;
+}
+
+public sealed class LoggingOptions
+{
+    /// <summary>Minimum level written to the log file (PRD §30: Information by default).</summary>
+    public Microsoft.Extensions.Logging.LogLevel Level { get; set; } = Microsoft.Extensions.Logging.LogLevel.Information;
+
+    public int RetentionDays { get; set; } = 14;
 }
 
 public sealed class AutomaticOptions

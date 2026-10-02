@@ -1,4 +1,7 @@
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using ResetMe.Core.Domain;
+using ResetMe.Core.Logging;
 using ResetMe.Core.Policies;
 using ResetMe.Core.Ports;
 using ResetMe.Core.Reset;
@@ -39,8 +42,10 @@ public sealed class RateLimitMonitor
     private readonly GuardOptions _options;
     private readonly MonitorTiming _timing;
     private readonly TimeProvider _time;
+    private readonly ILogger _logger;
     private readonly HashSet<string> _seenEpisodes = [];
     private volatile bool _accountDirty = true;
+    private bool _wasBlocked;
 
     public RateLimitMonitor(
         ICodexConnector connector,
@@ -49,8 +54,10 @@ public sealed class RateLimitMonitor
         IMonitorObserver observer,
         GuardOptions options,
         MonitorTiming timing,
-        TimeProvider time)
+        TimeProvider time,
+        ILogger<RateLimitMonitor>? logger = null)
     {
+        _logger = logger ?? NullLogger<RateLimitMonitor>.Instance;
         _connector = connector;
         _resetManagerFactory = resetManagerFactory;
         _store = store;
@@ -71,6 +78,7 @@ public sealed class RateLimitMonitor
             {
                 connection = await _connector.ConnectAsync(cancellationToken).ConfigureAwait(false);
                 _accountDirty = true;
+                MonitorLog.Connected(_logger, _options.Mode.ToString(), _timing.PollInterval.TotalSeconds);
                 await RunConnectedAsync(connection, () => failures = 0, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -82,6 +90,7 @@ public sealed class RateLimitMonitor
                 var backoff = _timing.ReconnectBackoff;
                 var delay = backoff.Count == 0 ? TimeSpan.Zero : backoff[Math.Min(failures, backoff.Count - 1)];
                 failures++;
+                MonitorLog.Unavailable(_logger, ex, delay.TotalSeconds);
                 _observer.OnUnavailable(ex, delay);
                 if (!await DelayAsync(delay, cancellationToken).ConfigureAwait(false))
                 {
@@ -101,6 +110,12 @@ public sealed class RateLimitMonitor
     private async Task RunConnectedAsync(ICodexConnection connection, Action onHealthyRead, CancellationToken cancellationToken)
     {
         using var wake = new SemaphoreSlim(0, 1);
+        void OnUsageSignal()
+        {
+            MonitorLog.Push(_logger, "usage");
+            Poke();
+        }
+
         void Poke()
         {
             try
@@ -118,11 +133,12 @@ public sealed class RateLimitMonitor
 
         void OnAccount()
         {
+            MonitorLog.Push(_logger, "account");
             _accountDirty = true;
             Poke();
         }
 
-        connection.UsageChanged += Poke;
+        connection.UsageChanged += OnUsageSignal;
         connection.AccountChanged += OnAccount;
         try
         {
@@ -137,6 +153,7 @@ public sealed class RateLimitMonitor
                     if (!account.IsAuthenticated)
                     {
                         _accountDirty = true;
+                        MonitorLog.AuthRequired(_logger);
                         _observer.OnAuthRequired();
                         await WaitAsync(wake, _timing.AuthRetryInterval, cancellationToken).ConfigureAwait(false);
                         continue;
@@ -152,6 +169,13 @@ public sealed class RateLimitMonitor
 
                 onHealthyRead();
                 var assessment = LimitEvaluator.Assess(usage, _options, _time.GetUtcNow());
+                MonitorLog.Usage(_logger, usage.FiveHour?.UsedPercent, usage.Weekly?.UsedPercent, usage.UsageAllowed, usage.AvailableResetCount);
+                if (_wasBlocked && !assessment.Blocked)
+                {
+                    MonitorLog.Recovered(_logger);
+                }
+
+                _wasBlocked = assessment.Blocked;
                 _observer.OnUsage(usage, assessment);
 
                 if (assessment.Blocked
@@ -166,7 +190,7 @@ public sealed class RateLimitMonitor
         }
         finally
         {
-            connection.UsageChanged -= Poke;
+            connection.UsageChanged -= OnUsageSignal;
             connection.AccountChanged -= OnAccount;
         }
     }
@@ -186,12 +210,20 @@ public sealed class RateLimitMonitor
 
         var handling = DecideHandling(assessment, episode);
         var notice = new LimitNotice(usage, assessment, handling);
+        MonitorLog.Episode(
+            _logger,
+            episode,
+            string.Join(",", assessment.ExhaustedWindows),
+            handling.ToString(),
+            assessment.NoOfferReason?.ToString() ?? "-");
         _observer.OnLimitReached(notice);
 
         switch (handling)
         {
             case LimitHandling.AskUser:
-                if (!await _observer.ConfirmResetAsync(notice, cancellationToken).ConfigureAwait(false))
+                var accepted = await _observer.ConfirmResetAsync(notice, cancellationToken).ConfigureAwait(false);
+                MonitorLog.Decision(_logger, accepted ? "accepted" : "declined", episode);
+                if (!accepted)
                 {
                     return false;
                 }
@@ -235,6 +267,7 @@ public sealed class RateLimitMonitor
             var report = await _resetManagerFactory(connection)
                 .ExecuteAsync(new ResetRequest(Automatic: automatic), cancellationToken)
                 .ConfigureAwait(false);
+            MonitorLog.ResetFinished(_logger, report.Status.ToString());
             _observer.OnResetCompleted(report);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -244,6 +277,7 @@ public sealed class RateLimitMonitor
         catch (Exception ex)
         {
             // Not retried here: a persisted pending attempt is resumed by an explicit `resetme reset`.
+            MonitorLog.ResetFailed(_logger, ex);
             _observer.OnResetFailed(ex);
         }
     }

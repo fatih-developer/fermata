@@ -71,6 +71,19 @@ internal static class DoctorCommand
             Report(Level.Fail, "State", ex.Message);
         }
 
+        try
+        {
+            Directory.CreateDirectory(paths.LogDirectory);
+            var probe = Path.Combine(paths.LogDirectory, ".write-test");
+            File.WriteAllText(probe, "");
+            File.Delete(probe);
+            Report(Level.Ok, "Log directory", $"{paths.LogDirectory} (level {config?.Options.Logging.Level.ToString().ToLowerInvariant() ?? "information"})");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Report(Level.Warn, "Log directory", $"not writable: {ex.Message}");
+        }
+
         using (var handle = new FileResetLock(paths.LockFile).TryAcquire())
         {
             Report(handle is null ? Level.Warn : Level.Ok, "Reset lock",

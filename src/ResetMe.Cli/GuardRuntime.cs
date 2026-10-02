@@ -30,6 +30,7 @@ internal sealed class GuardRuntime
         var paths = AppPaths.Default();
         paths.EnsureRoot();
         var config = new TomlConfigStore(paths.ConfigFile).Load();
+        AppLogging.Initialize(paths, config.Options.Logging);
         return new GuardRuntime(paths, config);
     }
 
@@ -37,5 +38,6 @@ internal sealed class GuardRuntime
         CodexAppServerClient.StartAsync(
             new CodexClientOptions { Executable = Options.CodexExecutable },
             TimeProvider.System,
-            cancellationToken);
+            cancellationToken,
+            AppLogging.Factory.CreateLogger("ResetMe.Codex"));
 }

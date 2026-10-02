@@ -102,6 +102,25 @@ public sealed class TomlConfigStore
             a.MaxResetsPerWeek = NonNegative(automatic.MaxResetsPerWeek, a.MaxResetsPerWeek, "automatic.max_resets_per_week", warnings);
         }
 
+        if (file.Logging is { } logging)
+        {
+            if (logging.Level is { } level)
+            {
+                if (Enum.TryParse<Microsoft.Extensions.Logging.LogLevel>(level, ignoreCase: true, out var parsed)
+                    && parsed != Microsoft.Extensions.Logging.LogLevel.None)
+                {
+                    options.Logging.Level = parsed;
+                }
+                else
+                {
+                    warnings.Add($"Unknown logging.level '{level}'; using 'information'.");
+                }
+            }
+
+            var retention = NonNegative(logging.RetentionDays, options.Logging.RetentionDays, "logging.retention_days", warnings);
+            options.Logging.RetentionDays = retention == 0 ? 1 : retention;
+        }
+
         options.CodexExecutable = file.Codex?.Executable ?? options.CodexExecutable;
         return options;
     }
@@ -153,6 +172,11 @@ public sealed class TomlConfigStore
         max_resets_per_day = 1
         max_resets_per_week = 2
 
+        [logging]
+        # error | warning | information | debug | trace
+        level = "information"
+        retention_days = 14
+
         [codex]
         executable = ""                # empty = search PATH
 
@@ -175,7 +199,16 @@ internal sealed class ConfigFile
 
     public CodexSection? Codex { get; set; }
 
+    public LoggingSection? Logging { get; set; }
+
     public UiSection? Ui { get; set; }
+}
+
+internal sealed class LoggingSection
+{
+    public string? Level { get; set; }
+
+    public int? RetentionDays { get; set; }
 }
 
 internal sealed class MonitorSection

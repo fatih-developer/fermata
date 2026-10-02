@@ -1,6 +1,10 @@
+using System.Diagnostics;
 using System.Reflection;
 using System.Text.Json.Nodes;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using ResetMe.Codex.JsonRpc;
+using ResetMe.Codex.Logging;
 using ResetMe.Core.Domain;
 using ResetMe.Core.Ports;
 
@@ -34,18 +38,22 @@ public sealed class CodexAppServerClient : ICodexConnection
     private readonly AppServerProcess? _process;
     private readonly CodexClientOptions _options;
     private readonly TimeProvider _time;
+    private readonly ILogger _logger;
 
     private CodexAppServerClient(
         JsonRpcConnection connection,
         AppServerProcess? process,
         CodexClientOptions options,
-        TimeProvider time)
+        TimeProvider time,
+        ILogger? logger)
     {
         _connection = connection;
         _process = process;
         _options = options;
         _time = time;
+        _logger = logger ?? NullLogger.Instance;
         _connection.NotificationReceived += OnNotification;
+        _connection.Closed += OnClosed;
     }
 
     /// <summary>Raised when the server pushes <c>account/rateLimits/updated</c>; callers should re-read.</summary>
@@ -67,8 +75,10 @@ public sealed class CodexAppServerClient : ICodexConnection
     public static async Task<CodexAppServerClient> StartAsync(
         CodexClientOptions options,
         TimeProvider time,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        ILogger? logger = null)
     {
+        logger ??= NullLogger.Instance;
         ArgumentNullException.ThrowIfNull(options);
 
         var executable = CodexLocator.Resolve(options.Executable)
@@ -77,6 +87,7 @@ public sealed class CodexAppServerClient : ICodexConnection
                     ? "codex executable not found on PATH."
                     : $"codex executable not found at '{options.Executable}'.");
 
+        CodexLog.Starting(logger, executable);
         AppServerProcess process;
         try
         {
@@ -88,7 +99,7 @@ public sealed class CodexAppServerClient : ICodexConnection
         }
 
         var connection = new JsonRpcConnection(process.Output, process.Input);
-        var client = new CodexAppServerClient(connection, process, options, time);
+        var client = new CodexAppServerClient(connection, process, options, time, logger);
         try
         {
             await client.InitializeAsync(cancellationToken).ConfigureAwait(false);
@@ -97,6 +108,7 @@ public sealed class CodexAppServerClient : ICodexConnection
         catch (Exception ex) when (ex is CodexTransientException or JsonRpcException)
         {
             var stderr = string.Join(Environment.NewLine, process.RecentStderr.TakeLast(5));
+            CodexLog.InitializeFailed(logger, ex, stderr);
             await client.DisposeAsync().ConfigureAwait(false);
             throw new CodexUnavailableException(
                 $"codex app-server did not complete initialize. {stderr}".Trim(), ex);
@@ -110,7 +122,7 @@ public sealed class CodexAppServerClient : ICodexConnection
         TimeProvider time,
         CancellationToken cancellationToken)
     {
-        var client = new CodexAppServerClient(connection, null, options, time);
+        var client = new CodexAppServerClient(connection, null, options, time, null);
         await client.InitializeAsync(cancellationToken).ConfigureAwait(false);
         return client;
     }
@@ -119,8 +131,7 @@ public sealed class CodexAppServerClient : ICodexConnection
     {
         // supportsLunaReserve is deliberately never sent: it records experiment exposure.
         var parameters = new JsonObject { ["excludeResetCreditDetails"] = !includeCreditDetails };
-        var result = await _connection
-            .RequestAsync("account/rateLimits/read", parameters, _options.RequestTimeout, cancellationToken)
+        var result = await RequestAsync("account/rateLimits/read", parameters, _options.RequestTimeout, cancellationToken)
             .ConfigureAwait(false);
         return ProtocolMapper.MapUsage(result, _time.GetUtcNow());
     }
@@ -128,8 +139,7 @@ public sealed class CodexAppServerClient : ICodexConnection
     public async Task<AccountStatus> GetAccountAsync(CancellationToken cancellationToken)
     {
         var parameters = new JsonObject { ["refreshToken"] = false };
-        var result = await _connection
-            .RequestAsync("account/read", parameters, _options.RequestTimeout, cancellationToken)
+        var result = await RequestAsync("account/read", parameters, _options.RequestTimeout, cancellationToken)
             .ConfigureAwait(false);
         return ProtocolMapper.MapAccount(result);
     }
@@ -147,8 +157,7 @@ public sealed class CodexAppServerClient : ICodexConnection
             parameters["creditId"] = creditId;
         }
 
-        var result = await _connection
-            .RequestAsync("account/rateLimitResetCredit/consume", parameters, _options.ConsumeTimeout, cancellationToken)
+        var result = await RequestAsync("account/rateLimitResetCredit/consume", parameters, _options.ConsumeTimeout, cancellationToken)
             .ConfigureAwait(false);
         return ProtocolMapper.MapOutcome(result);
     }
@@ -156,9 +165,28 @@ public sealed class CodexAppServerClient : ICodexConnection
     public async ValueTask DisposeAsync()
     {
         _connection.NotificationReceived -= OnNotification;
+        _connection.Closed -= OnClosed;
         _process?.Dispose(); // Closing stdio ends the read loop.
         await _connection.DisposeAsync().ConfigureAwait(false);
     }
+
+    private async Task<JsonNode?> RequestAsync(string method, JsonNode? parameters, TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        var started = Stopwatch.GetTimestamp();
+        try
+        {
+            var result = await _connection.RequestAsync(method, parameters, timeout, cancellationToken).ConfigureAwait(false);
+            CodexLog.RequestCompleted(_logger, method, (long)Stopwatch.GetElapsedTime(started).TotalMilliseconds);
+            return result;
+        }
+        catch (Exception ex) when (ex is CodexTransientException or JsonRpcException)
+        {
+            CodexLog.RequestFailed(_logger, ex, method, (long)Stopwatch.GetElapsedTime(started).TotalMilliseconds);
+            throw;
+        }
+    }
+
+    private void OnClosed(Exception? error) => CodexLog.Closed(_logger, error);
 
     private async Task InitializeAsync(CancellationToken cancellationToken)
     {
@@ -182,13 +210,13 @@ public sealed class CodexAppServerClient : ICodexConnection
             },
         };
 
-        var result = await _connection
-            .RequestAsync("initialize", parameters, _options.RequestTimeout, cancellationToken)
+        var result = await RequestAsync("initialize", parameters, _options.RequestTimeout, cancellationToken)
             .ConfigureAwait(false);
         await _connection.NotifyAsync("initialized", new JsonObject(), cancellationToken).ConfigureAwait(false);
 
         CodexHome = result?["codexHome"]?.GetValue<string>();
         CodexVersion = ParseVersion(result?["userAgent"]?.GetValue<string>());
+        CodexLog.Connected(_logger, CodexVersion ?? "unknown");
     }
 
     /// <summary>"name/0.159.3 (Windows ...)" → "0.159.3".</summary>
