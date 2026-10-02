@@ -87,8 +87,8 @@ public sealed class TrayController : IDisposable
 
     private void Refresh()
     {
-        _fiveHour.Header = $"5-hour usage     {_vm.FiveHourText}";
-        _weekly.Header = $"Weekly usage     {_vm.WeeklyText}";
+        _fiveHour.Header = $"5-hour usage     {_vm.FiveHourText}  ({_vm.FiveHourLeftText})";
+        _weekly.Header = $"Weekly usage     {_vm.WeeklyText}  ({_vm.WeeklyLeftText})";
         _credits.Header = $"Reset credits     {_vm.CreditsText}";
         _status.Header = _vm.StatusText;
         _resetNow.IsEnabled = _vm.ResetNowCommand.CanExecute(null);

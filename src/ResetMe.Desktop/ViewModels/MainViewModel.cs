@@ -40,6 +40,9 @@ public sealed partial class MainViewModel : ObservableObject
 
     public ObservableCollection<string> Events { get; } = [];
 
+    /// <summary>Zone used for wall-clock reset times; tests pin it to UTC.</summary>
+    public TimeZoneInfo TimeZone { get; set; } = TimeZoneInfo.Local;
+
     public static IReadOnlyList<string> ModeNames { get; } = ["Manual", "Confirm", "Automatic"];
 
     [ObservableProperty]
@@ -51,6 +54,13 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty]
     public partial string FiveHourResetText { get; set; } = "";
 
+    /// <summary>"82% used · 18% left" (Codex itself reports the remaining share).</summary>
+    [ObservableProperty]
+    public partial string FiveHourDetailText { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string FiveHourLeftText { get; set; } = "";
+
     [ObservableProperty]
     public partial double WeeklyPercent { get; set; }
 
@@ -59,6 +69,12 @@ public sealed partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     public partial string WeeklyResetText { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string WeeklyDetailText { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string WeeklyLeftText { get; set; } = "";
 
     [ObservableProperty]
     public partial string CreditsText { get; set; } = "–";
@@ -126,9 +142,13 @@ public sealed partial class MainViewModel : ObservableObject
         FiveHourPercent = Clamp(usage.FiveHour?.UsedPercent);
         FiveHourText = Percent(usage.FiveHour);
         FiveHourResetText = ResetsIn(usage.FiveHour, now);
+        FiveHourLeftText = Left(usage.FiveHour);
+        FiveHourDetailText = Detail(usage.FiveHour);
         WeeklyPercent = Clamp(usage.Weekly?.UsedPercent);
         WeeklyText = Percent(usage.Weekly);
         WeeklyResetText = ResetsIn(usage.Weekly, now);
+        WeeklyLeftText = Left(usage.Weekly);
+        WeeklyDetailText = Detail(usage.Weekly);
         CreditsText = usage.ResetCreditsReported ? usage.AvailableResetCount.ToString(CultureInfo.InvariantCulture) : "n/a";
         CreditExpiryText = LimitEvaluator.SelectCredit(usage.Credits)?.ExpiresAt is { } expires
             ? $"next expires in {NotificationTexts.Duration(expires - now)}"
@@ -231,6 +251,28 @@ public sealed partial class MainViewModel : ObservableObject
     private static string Percent(UsageWindow? window) =>
         window is null ? "n/a" : string.Create(CultureInfo.InvariantCulture, $"{window.UsedPercent:0}%");
 
-    private static string ResetsIn(UsageWindow? window, DateTimeOffset now) =>
-        window?.ResetsAt is { } at ? $"resets in {NotificationTexts.Duration(at - now)}" : "";
+    private static string Left(UsageWindow? window) =>
+        window is null ? "" : string.Create(CultureInfo.InvariantCulture, $"{Math.Max(0, 100 - window.UsedPercent):0}% left");
+
+    private static string Detail(UsageWindow? window) =>
+        window is null ? "" : $"{Percent(window)} used · {Left(window)}";
+
+    /// <summary>"resets in 3h 3m (02:31)", or "(02:31 on 3 Oct)" when it is not today.</summary>
+    private string ResetsIn(UsageWindow? window, DateTimeOffset now)
+    {
+        if (window?.ResetsAt is not { } at)
+        {
+            return "";
+        }
+
+        var local = TimeZoneInfo.ConvertTime(at, TimeZone);
+        var today = TimeZoneInfo.ConvertTime(now, TimeZone).Date;
+        var clock = local.ToString("HH:mm", CultureInfo.InvariantCulture);
+        if (local.Date != today)
+        {
+            clock += " on " + local.ToString("d MMM", CultureInfo.InvariantCulture);
+        }
+
+        return $"resets in {NotificationTexts.Duration(at - now)} ({clock})";
+    }
 }

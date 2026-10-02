@@ -7,7 +7,8 @@ namespace ResetMe.Desktop.Tests;
 
 public class ViewModelTests
 {
-    private static MainViewModel NewViewModel() => new(() => Task.CompletedTask, () => Task.CompletedTask, () => { });
+    private static MainViewModel NewViewModel() =>
+        new(() => Task.CompletedTask, () => Task.CompletedTask, () => { }) { TimeZone = TimeZoneInfo.Utc };
 
     [Fact]
     public void Healthy_usage_shows_monitoring_and_no_reset()
@@ -20,7 +21,10 @@ public class ViewModelTests
         Assert.Equal(HealthKind.Ok, vm.Health);
         Assert.Equal("Monitoring", vm.StatusText);
         Assert.Equal("42%", vm.FiveHourText);
-        Assert.Equal("resets in 3h 0m", vm.FiveHourResetText);
+        Assert.Equal("resets in 3h 0m (15:00)", vm.FiveHourResetText);
+        Assert.Equal("resets in 4d 0h (12:00 on 6 Oct)", vm.WeeklyResetText);
+        Assert.Equal("42% used · 58% left", vm.FiveHourDetailText);
+        Assert.Equal("70% left", vm.WeeklyLeftText);
         Assert.Equal("2", vm.CreditsText);
         Assert.Equal("next expires in 9d 0h", vm.CreditExpiryText);
         Assert.False(vm.CanResetNow);

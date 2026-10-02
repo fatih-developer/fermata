@@ -52,6 +52,7 @@
           <ProgressBar Value="{Binding FiveHourPercent}" Maximum="100" Foreground="{Binding FiveHourPercent, Converter={x:Static views:PercentBrushConverter.Instance}}" VerticalAlignment="Center" Margin="0,0,12,0" />
           <TextBlock Grid.Column="1" Classes="value" Text="{Binding FiveHourText}" MinWidth="64" TextAlignment="Right" />
         </Grid>
+        <TextBlock Classes="hint" Text="{Binding FiveHourDetailText}" />
       </StackPanel>
 
       <StackPanel Spacing="6">
@@ -63,6 +64,7 @@
           <ProgressBar Value="{Binding WeeklyPercent}" Maximum="100" Foreground="{Binding WeeklyPercent, Converter={x:Static views:PercentBrushConverter.Instance}}" VerticalAlignment="Center" Margin="0,0,12,0" />
           <TextBlock Grid.Column="1" Classes="value" Text="{Binding WeeklyText}" MinWidth="64" TextAlignment="Right" />
         </Grid>
+        <TextBlock Classes="hint" Text="{Binding WeeklyDetailText}" />
       </StackPanel>
 
       <Grid ColumnDefinitions="*,Auto">

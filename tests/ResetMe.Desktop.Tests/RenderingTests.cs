@@ -18,7 +18,7 @@ public class RenderingTests
     [AvaloniaFact]
     public void Main_window_renders_the_blocked_state()
     {
-        var vm = new MainViewModel(() => Task.CompletedTask, () => Task.CompletedTask, () => { });
+        var vm = new MainViewModel(() => Task.CompletedTask, () => Task.CompletedTask, () => { }) { TimeZone = TimeZoneInfo.Utc };
         var usage = Fixtures.Blocked();
         vm.ApplyUsage(usage, LimitEvaluator.Assess(usage, new GuardOptions(), Fixtures.Now), Fixtures.Now);
         vm.AddEvent("5-hour Codex limit reached. 2 reset credit(s) available. Open ResetMe to use one.", Fixtures.Now);
@@ -37,7 +37,7 @@ public class RenderingTests
     [AvaloniaFact]
     public void Main_window_renders_the_healthy_state()
     {
-        var vm = new MainViewModel(() => Task.CompletedTask, () => Task.CompletedTask, () => { });
+        var vm = new MainViewModel(() => Task.CompletedTask, () => Task.CompletedTask, () => { }) { TimeZone = TimeZoneInfo.Utc };
         var usage = Fixtures.Healthy(62, 41);
         vm.ApplyUsage(usage, LimitEvaluator.Assess(usage, new GuardOptions(), Fixtures.Now), Fixtures.Now);
 
@@ -53,7 +53,7 @@ public class RenderingTests
     [AvaloniaFact]
     public void Main_window_renders_the_settings_panel()
     {
-        var vm = new MainViewModel(() => Task.CompletedTask, () => Task.CompletedTask, () => { });
+        var vm = new MainViewModel(() => Task.CompletedTask, () => Task.CompletedTask, () => { }) { TimeZone = TimeZoneInfo.Utc };
         var usage = Fixtures.Healthy(62, 41);
         vm.ApplyUsage(usage, LimitEvaluator.Assess(usage, new GuardOptions(), Fixtures.Now), Fixtures.Now);
         vm.LoadSettings(new GuardOptions(), startAtLogin: true);
@@ -71,7 +71,7 @@ public class RenderingTests
     [AvaloniaFact]
     public void Tray_menu_mirrors_the_view_model()
     {
-        var vm = new MainViewModel(() => Task.CompletedTask, () => Task.CompletedTask, () => { });
+        var vm = new MainViewModel(() => Task.CompletedTask, () => Task.CompletedTask, () => { }) { TimeZone = TimeZoneInfo.Utc };
         using var tray = new TrayController(vm, () => { }, _ => Task.CompletedTask, () => { });
 
         var usage = Fixtures.Blocked();
@@ -79,7 +79,7 @@ public class RenderingTests
         vm.ModeIndex = (int)GuardMode.Automatic;
 
         var items = tray.Menu.Items.OfType<Avalonia.Controls.NativeMenuItem>().ToList();
-        Assert.Contains(items, i => i.Header == "5-hour usage     100%");
+        Assert.Contains(items, i => i.Header == "5-hour usage     100%  (0% left)");
         Assert.Contains(items, i => i.Header == "Reset credits     2");
         Assert.Contains(items, i => i.Header == "Limit reached");
         Assert.True(items.Single(i => i.Header == "Reset now…").IsEnabled);
