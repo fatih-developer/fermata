@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CodexResetGuard.Cli/CodexResetGuard.Cli.csproj" />
+    <Project Path="src/CodexResetGuard.Codex/CodexResetGuard.Codex.csproj" />
+    <Project Path="src/CodexResetGuard.Core/CodexResetGuard.Core.csproj" />
+    <Project Path="src/CodexResetGuard.Platform/CodexResetGuard.Platform.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/CodexResetGuard.Codex.Tests/CodexResetGuard.Codex.Tests.csproj" />
+    <Project Path="tests/CodexResetGuard.Core.Tests/CodexResetGuard.Core.Tests.csproj" />
+  </Folder>
+</Solution>
