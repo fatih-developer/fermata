@@ -549,6 +549,8 @@ System Tray / AppIndicator destekleniyorsa kullanılır.
 
 Tray desteği olmayan desktop environment'larda CLI/background service çalışmaya devam eder.
 
+**Uygulama (MVP-2):** Avalonia `TrayIcon` (Windows tray, macOS menu bar extra, Linux StatusNotifierItem). Tray olmayan masaüstlerinde (ör. eklentisiz GNOME) uygulamayı yeniden başlatmak, çalışan örneğin penceresini öne getirir (tek örnek + named pipe). Başsız Linux için `resetme daemon` + `systemd --user` servisi kullanılır.
+
 ---
 
 ## 13. Önerilen Teknik Mimari
@@ -1351,6 +1353,20 @@ Desktop integration.
 - Native notifications
 - Start at login
 
+**Durum: tamamlandı (2026-10-02).**
+
+| Parça | Uygulama |
+|---|---|
+| Masaüstü uygulaması | `ResetMeApp` (Avalonia 12): durum penceresi, ayarlar, reset onay penceresi (§38), son olaylar. Kapatınca tray'e gizlenir. |
+| Tray / menu bar | Menü (§37): kullanım, krediler, "Reset now…", Mode alt menüsü, pencere, loglar, çıkış. Simge çalışma anında çizilir (kullanım halkası, sağlık rengi). |
+| Bildirimler | Windows: PowerShell WinRT toast. macOS: `osascript display notification`. Linux: `notify-send`. Yoksa terminal/log. Limit olayı ve reset sonucu başına bir bildirim (§32). |
+| Açılışta başlatma | Windows: HKCU Run (tray uygulaması). macOS: LaunchAgent (`com.resetme.desktop` / `com.resetme.daemon`). Linux: XDG autostart (masaüstü) veya `systemd --user` servisi (daemon). CLI: `resetme autostart status/enable/disable [--target]`; uygulamada "Start ResetMe at login". |
+| Arka plan servisi | `resetme daemon`: başsız monitör; soru sormaz, confirm modunda yalnızca bildirir; automatic modda tüm korumalarla reset yapar. |
+| Paketleme | `scripts/package.sh <rid>`: Windows zip, Linux tar.gz, macOS `ResetMe.app` (LSUIElement, yalnızca menü çubuğu). CLI ve uygulama yan yana; büyük/küçük harf çakışması kontrolü. |
+| Doğrulama | Headless render testleri (ekran görüntüleri), host ve view model testleri; CI'da her OS'ta paket + sahte Codex'e karşı daemon smoke testi. Windows'ta gerçek pencereyle UI Automation e2e (onay → tek consume) yapıldı. |
+
+Uygulamanın çalıştırılabilir adı `ResetMeApp`'tir: `ResetMe` adı, büyük/küçük harf ayırmayan dosya sistemlerinde (macOS, Windows) `resetme` CLI'ı ile çakışır.
+
 ---
 
 ## 42. MVP-3
@@ -1400,6 +1416,7 @@ Bu nedenle Windows release'leri için:
 
 - Tüm `.exe` ve `.dll` dosyaları **Authenticode ile imzalanmalıdır** (EV veya Azure Trusted Signing).
 - İmzasız geliştirme build'lerinin Smart App Control açık makinelerde engellenebileceği README'de belirtilmelidir.
+- Avalonia'nın NuGet DLL'leri de imzasızdır (yalnızca SkiaSharp Microsoft imzalı); `Avalonia.Build.Tasks.dll` Smart App Control açık makinede **derlemeyi** de engelledi. Release için önerilen yol: masaüstü uygulamasını ve CLI'ı **NativeAOT** ile tek native exe olarak yayınlamak ve yalnızca bu exe'leri imzalamak. Geliştirmede derleme Linux konteynerinde yapılabilir (`scripts/dotnet-in-docker.sh`).
 
 ---
 
@@ -1621,10 +1638,11 @@ Platform adapter gerekir.
 - Ayrı Codex süreçlerindeki kullanımın push ile gelip gelmediği
 - Polling için sunucu tarafı limit olup olmadığı
 
-MVP-2 öncesinde kararlaştırılacaklar:
+MVP-2'de kapatılanlar:
 
-- macOS notification adapter seçimi
-- Linux notification fallback mekanizması
+- macOS notification adapter: `osascript` (`display notification`; metin argv ile geçer, kaçış gerektirmez).
+- Linux notification fallback: `notify-send` yoksa veya grafik oturum yoksa terminal çıktısı ve log.
+- Windows notification: PowerShell'in WinRT köprüsü (ek paket veya Windows'a özel TFM gerekmez). Gönderen "Windows PowerShell" görünür; kendi AppUserModelID'si için installer'da Start Menu kısayolu gerekir (paketleme işi).
 
 Bu kararlar ürün kapsamını değiştirmez; entegrasyon implementasyonunu etkiler.
 

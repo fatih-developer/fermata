@@ -12,27 +12,7 @@ internal static class Format
         window is null ? "  n/a" : string.Create(CultureInfo.InvariantCulture, $"{window.UsedPercent,4:0}%");
 
     /// <summary>"2h 40m", "3d 4h", "8m", "<1m".</summary>
-    public static string Duration(TimeSpan span)
-    {
-        if (span <= TimeSpan.Zero)
-        {
-            return "now";
-        }
-
-        if (span.TotalDays >= 1)
-        {
-            return string.Create(CultureInfo.InvariantCulture, $"{(int)span.TotalDays}d {span.Hours}h");
-        }
-
-        if (span.TotalHours >= 1)
-        {
-            return string.Create(CultureInfo.InvariantCulture, $"{(int)span.TotalHours}h {span.Minutes}m");
-        }
-
-        return span.TotalMinutes >= 1
-            ? string.Create(CultureInfo.InvariantCulture, $"{(int)span.TotalMinutes}m")
-            : "<1m";
-    }
+    public static string Duration(TimeSpan span) => ResetMe.Core.Monitoring.NotificationTexts.Duration(span);
 
     public static string ResetsIn(UsageWindow? window, DateTimeOffset now) =>
         window?.ResetsAt is { } at ? $"resets in {Duration(at - now)}" : "";

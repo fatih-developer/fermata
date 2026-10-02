@@ -18,7 +18,7 @@ internal static class DoctorCommand
         Skip,
     }
 
-    public static async Task<int> RunAsync(CancellationToken cancellationToken)
+    public static async Task<int> RunAsync(bool sendTestNotification, CancellationToken cancellationToken)
     {
         var failures = 0;
         void Report(Level level, string check, string detail = "")
@@ -150,7 +150,23 @@ internal static class DoctorCommand
             }
         }
 
-        Report(Level.Skip, "Desktop notifications", "arrives in MVP-2; terminal output is used");
+        var notifier = Platform.Notifications.NotifierFactory.Create(config?.Options.NotificationsEnabled ?? true);
+        Report(notifier.IsAvailable ? Level.Ok : Level.Warn, "Desktop notifications",
+            notifier.IsAvailable ? notifier.Mechanism : $"{notifier.Mechanism}; terminal and log are used instead");
+        if (sendTestNotification && notifier.IsAvailable)
+        {
+            var shown = await notifier.ShowAsync(
+                new Core.Ports.Notification(Core.Ports.NotificationKind.Info, "ResetMe test", "Notifications work."),
+                cancellationToken).ConfigureAwait(false);
+            Report(shown ? Level.Ok : Level.Fail, "Test notification", shown ? "sent" : "the notification helper failed");
+        }
+
+        var autostart = Platform.Autostart.AutostartFactory.Create();
+        foreach (var target in new[] { Platform.Autostart.AutostartTarget.Desktop, Platform.Autostart.AutostartTarget.Daemon })
+        {
+            var status = autostart.GetStatus(target);
+            Report(Level.Ok, $"Autostart ({target.ToString().ToLowerInvariant()})", $"{(status.Enabled ? "enabled" : "disabled")} via {status.Mechanism}");
+        }
         return Finish(failures);
     }
 

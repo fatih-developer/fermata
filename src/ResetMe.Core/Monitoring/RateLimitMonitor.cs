@@ -138,6 +138,7 @@ public sealed class RateLimitMonitor
             Poke();
         }
 
+        var firstRead = true;
         connection.UsageChanged += OnUsageSignal;
         connection.AccountChanged += OnAccount;
         try
@@ -160,13 +161,16 @@ public sealed class RateLimitMonitor
                     }
                 }
 
-                var usage = await connection.GetUsageAsync(includeCreditDetails: false, cancellationToken).ConfigureAwait(false);
-                if (LimitEvaluator.IsBlocked(usage))
+                // The first read after connecting includes credit details (expiry shown in UIs);
+                // later background polls stay light.
+                var usage = await connection.GetUsageAsync(includeCreditDetails: firstRead, cancellationToken).ConfigureAwait(false);
+                if (!firstRead && LimitEvaluator.IsBlocked(usage))
                 {
                     // Credit details (expiry, id) are only needed once a reset is on the table.
                     usage = await connection.GetUsageAsync(includeCreditDetails: true, cancellationToken).ConfigureAwait(false);
                 }
 
+                firstRead = false;
                 onHealthyRead();
                 var assessment = LimitEvaluator.Assess(usage, _options, _time.GetUtcNow());
                 MonitorLog.Usage(_logger, usage.FiveHour?.UsedPercent, usage.Weekly?.UsedPercent, usage.UsageAllowed, usage.AvailableResetCount);
@@ -254,7 +258,7 @@ public sealed class RateLimitMonitor
 
         return _options.Mode switch
         {
-            GuardMode.Confirm => LimitHandling.AskUser,
+            GuardMode.Confirm => _observer.CanConfirm ? LimitHandling.AskUser : LimitHandling.ReportOnly,
             GuardMode.Automatic => LimitHandling.ResetAutomatically,
             _ => LimitHandling.ReportOnly,
         };

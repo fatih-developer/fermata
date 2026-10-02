@@ -24,6 +24,9 @@ public sealed class GuardOptions
 
     public bool NotificationsEnabled { get; set; } = true;
 
+    /// <summary>Desktop app starts hidden in the tray / menu bar.</summary>
+    public bool StartMinimized { get; set; } = true;
+
     /// <summary>Path to the codex executable; empty means search PATH.</summary>
     public string CodexExecutable { get; set; } = "";
 }

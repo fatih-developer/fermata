@@ -6,6 +6,7 @@ using ResetMe.Core.Domain;
 using ResetMe.Core.Monitoring;
 using ResetMe.Core.Policies;
 using ResetMe.Core.Reset;
+using ResetMe.Platform.Notifications;
 
 namespace ResetMe.Cli.Commands;
 
@@ -39,7 +40,11 @@ internal static class WatchCommand
             connector,
             client => new ResetManager(client, runtime.StateStore, runtime.Lock, options, TimeProvider.System, AppLogging.Factory.CreateLogger<ResetManager>()),
             runtime.StateStore,
-            new ConsoleWatchObserver(options),
+            new NotifyingObserver(
+                new ConsoleWatchObserver(options),
+                NotifierFactory.Create(options.NotificationsEnabled),
+                TimeProvider.System,
+                NotificationTexts.TerminalAskHint),
             options,
             timing,
             TimeProvider.System,
@@ -116,7 +121,9 @@ internal sealed class ConsoleWatchObserver : IMonitorObserver
 
             case LimitHandling.ReportOnly:
                 ResetPresenter.PrintOffer(notice.Usage, notice.Assessment, now);
-                Console.WriteLine("Manual mode: run `resetme reset` to use a credit.");
+                Console.WriteLine(_options.Mode == GuardMode.Manual
+                    ? "Manual mode: run `resetme reset` to use a credit."
+                    : "No interactive terminal to ask; run `resetme reset` to use a credit.");
                 Console.WriteLine();
                 break;
 
@@ -134,15 +141,11 @@ internal sealed class ConsoleWatchObserver : IMonitorObserver
         }
     }
 
+    /// <summary>Without an interactive stdin confirm mode only reports (and suggests `resetme reset`).</summary>
+    public bool CanConfirm => !Console.IsInputRedirected;
+
     public async Task<bool> ConfirmResetAsync(LimitNotice notice, CancellationToken cancellationToken)
     {
-        if (Console.IsInputRedirected)
-        {
-            Console.WriteLine("stdin is not interactive; run `resetme reset` to use a credit.");
-            Console.WriteLine();
-            return false;
-        }
-
         Console.Write("Use reset credit? [y/N] ");
         var answer = (await Task.Run(Console.ReadLine, cancellationToken).WaitAsync(cancellationToken).ConfigureAwait(false))
             ?.Trim().ToLowerInvariant();

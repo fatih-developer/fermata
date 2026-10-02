@@ -1,0 +1,33 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:ResetMe.Desktop.ViewModels"
+        x:Class="ResetMe.Desktop.Views.ConfirmWindow"
+        x:DataType="vm:ConfirmViewModel"
+        Title="ResetMe — use a reset credit?"
+        Width="420" SizeToContent="Height"
+        CanResize="False" Topmost="True" ShowInTaskbar="True"
+        WindowStartupLocation="CenterScreen">
+  <StackPanel Margin="22" Spacing="12">
+    <TextBlock Text="{Binding Headline}" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" />
+    <TextBlock Text="{Binding LiftsText}" Opacity="0.75" TextWrapping="Wrap"
+               IsVisible="{Binding LiftsText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+    <Border CornerRadius="8" Padding="12" Background="{DynamicResource ControlFillColorDefaultBrush}">
+      <StackPanel Spacing="4">
+        <TextBlock Text="{Binding FiveHourLine}" />
+        <TextBlock Text="{Binding WeeklyLine}" />
+        <TextBlock Text="{Binding CreditsLine}" FontWeight="SemiBold" Margin="0,6,0,0" />
+        <TextBlock Text="{Binding CreditDetail}" Opacity="0.75" TextWrapping="Wrap"
+                   IsVisible="{Binding CreditDetail, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+      </StackPanel>
+    </Border>
+
+    <TextBlock Text="{x:Static vm:ConfirmViewModel.ScopeText}" TextWrapping="Wrap" />
+    <TextBlock Text="{Binding Warning}" Foreground="#D99A1E" TextWrapping="Wrap" IsVisible="{Binding HasWarning}" />
+
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,8,0,0">
+      <Button x:Name="WaitButton" Content="Wait" IsCancel="True" />
+      <Button x:Name="UseButton" Content="Use reset credit" Classes="accent" />
+    </StackPanel>
+  </StackPanel>
+</Window>

@@ -18,3 +18,75 @@ jobs:
           dotnet-version: 10.0.x
       - run: dotnet build -c Release
       - run: dotnet test -c Release --no-build
+
+  package:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+          - os: macos-latest
+            rid: osx-arm64
+          - os: ubuntu-latest
+            rid: linux-x64
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Package
+        run: scripts/package.sh ${{ matrix.rid }} 0.2.0-ci.${{ github.run_number }}
+
+      - name: Smoke test the package (daemon against a fake Codex)
+        run: |
+          set -euo pipefail
+          mkdir smoke && cd smoke
+          case "${{ matrix.rid }}" in
+            win-*)
+              unzip -q ../artifacts/package/resetme-${{ matrix.rid }}.zip
+              cli=resetme/resetme.exe; app=resetme/ResetMeApp.exe
+              fake="$(cygpath -m "$GITHUB_WORKSPACE/scripts/fake-codex/codex.cmd")" ;;
+            osx-*)
+              tar -xzf ../artifacts/package/resetme-macos-arm64.tar.gz
+              plutil -lint ResetMe.app/Contents/Info.plist
+              cli=ResetMe.app/Contents/MacOS/resetme; app=ResetMe.app/Contents/MacOS/ResetMeApp
+              fake="$GITHUB_WORKSPACE/scripts/fake-codex/codex" ;;
+            linux-*)
+              tar -xzf ../artifacts/package/resetme-${{ matrix.rid }}.tar.gz
+              cli=resetme/resetme; app=resetme/ResetMeApp
+              fake="$GITHUB_WORKSPACE/scripts/fake-codex/codex" ;;
+          esac
+
+          test -f "$app"
+          "$cli" --version
+          "$cli" autostart
+
+          export RESETME_HOME="$PWD/home" FAKE_CODEX_STATE="$PWD/fake-state.json" FAKE_CODEX_LOG="$PWD/consume.log"
+          mkdir -p "$RESETME_HOME"
+          printf 'mode = "automatic"\n[notifications]\nenabled = false\n[reset]\nverify_after_seconds = 0\n[codex]\nexecutable = "%s"\n' "$fake" > "$RESETME_HOME/config.toml"
+
+          "$cli" daemon > daemon.out 2>&1 &
+          pid=$!
+          for _ in $(seq 1 60); do
+            grep -q "RESET Succeeded" daemon.out 2>/dev/null && break
+            sleep 1
+          done
+          kill "$pid" 2>/dev/null || true
+          cat daemon.out
+
+          grep -q "RESET Succeeded" daemon.out
+          test "$(wc -l < consume.log | tr -d ' ')" -eq 1
+          "$cli" logs -n 20
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: resetme-${{ matrix.rid }}
+          path: artifacts/package/resetme-*
+          if-no-files-found: error

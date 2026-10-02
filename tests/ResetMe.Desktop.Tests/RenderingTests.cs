@@ -1,0 +1,148 @@
+using Avalonia.Headless;
+using Avalonia.VisualTree;
+using Avalonia.Headless.XUnit;
+using Avalonia.Media.Imaging;
+using Avalonia.Threading;
+using ResetMe.Core.Monitoring;
+using ResetMe.Core.Policies;
+using ResetMe.Desktop.Tray;
+using ResetMe.Desktop.ViewModels;
+using ResetMe.Desktop.Views;
+using Xunit;
+
+namespace ResetMe.Desktop.Tests;
+
+/// <summary>Renders the real windows headlessly and saves PNGs for visual review.</summary>
+public class RenderingTests
+{
+    [AvaloniaFact]
+    public void Main_window_renders_the_blocked_state()
+    {
+        var vm = new MainViewModel(() => Task.CompletedTask, () => Task.CompletedTask, () => { });
+        var usage = Fixtures.Blocked();
+        vm.ApplyUsage(usage, LimitEvaluator.Assess(usage, new GuardOptions(), Fixtures.Now), Fixtures.Now);
+        vm.AddEvent("5-hour Codex limit reached. 2 reset credit(s) available. Open ResetMe to use one.", Fixtures.Now);
+        vm.AddEvent("Connected to Codex.", Fixtures.Now.AddMinutes(-30));
+
+        var window = new MainWindow { DataContext = vm, Width = 440, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var frame = Save(window.CaptureRenderedFrame(), "main-window-blocked.png");
+        Assert.Equal(440, frame.PixelSize.Width);
+        window.AllowClose = true;
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void Main_window_renders_the_healthy_state()
+    {
+        var vm = new MainViewModel(() => Task.CompletedTask, () => Task.CompletedTask, () => { });
+        var usage = Fixtures.Healthy(62, 41);
+        vm.ApplyUsage(usage, LimitEvaluator.Assess(usage, new GuardOptions(), Fixtures.Now), Fixtures.Now);
+
+        var window = new MainWindow { DataContext = vm, Width = 440, Height = 680 };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        Save(window.CaptureRenderedFrame(), "main-window-healthy.png");
+        window.AllowClose = true;
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void Main_window_renders_the_settings_panel()
+    {
+        var vm = new MainViewModel(() => Task.CompletedTask, () => Task.CompletedTask, () => { });
+        var usage = Fixtures.Healthy(62, 41);
+        vm.ApplyUsage(usage, LimitEvaluator.Assess(usage, new GuardOptions(), Fixtures.Now), Fixtures.Now);
+        vm.LoadSettings(new GuardOptions(), startAtLogin: true);
+
+        var window = new MainWindow { DataContext = vm, Width = 440, Height = 760 };
+        window.Show();
+        window.GetVisualDescendants().OfType<Avalonia.Controls.Expander>().Single().IsExpanded = true;
+        Dispatcher.UIThread.RunJobs();
+
+        Save(window.CaptureRenderedFrame(), "main-window-settings.png");
+        window.AllowClose = true;
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void Tray_menu_mirrors_the_view_model()
+    {
+        var vm = new MainViewModel(() => Task.CompletedTask, () => Task.CompletedTask, () => { });
+        using var tray = new TrayController(vm, () => { }, _ => Task.CompletedTask, () => { });
+
+        var usage = Fixtures.Blocked();
+        vm.ApplyUsage(usage, LimitEvaluator.Assess(usage, new GuardOptions(), Fixtures.Now), Fixtures.Now);
+        vm.ModeIndex = (int)GuardMode.Automatic;
+
+        var items = tray.Menu.Items.OfType<Avalonia.Controls.NativeMenuItem>().ToList();
+        Assert.Contains(items, i => i.Header == "5-hour usage     100%");
+        Assert.Contains(items, i => i.Header == "Reset credits     2");
+        Assert.Contains(items, i => i.Header == "Limit reached");
+        Assert.True(items.Single(i => i.Header == "Reset now…").IsEnabled);
+
+        var modes = items.Single(i => i.Header == "Mode").Menu!.Items.OfType<Avalonia.Controls.NativeMenuItem>().ToList();
+        Assert.Equal(["Automatic"], modes.Where(m => m.IsChecked).Select(m => m.Header));
+        Assert.Contains("5h 100%", tray.ToolTip, StringComparison.Ordinal);
+    }
+
+    [AvaloniaFact]
+    public void Confirm_window_renders_and_defaults_to_wait()
+    {
+        var usage = Fixtures.Blocked();
+        var assessment = LimitEvaluator.Assess(usage, new GuardOptions(), Fixtures.Now);
+        var dialog = new ConfirmWindow { DataContext = new ConfirmViewModel(new LimitNotice(usage, assessment, LimitHandling.AskUser), Fixtures.Now) };
+        dialog.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        Save(dialog.CaptureRenderedFrame(), "confirm-window.png");
+
+        dialog.Close(); // closing without a click means "wait"
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(dialog.Result.IsCompleted);
+        Assert.False(dialog.Result.Result);
+    }
+
+    [AvaloniaTheory]
+    [InlineData(HealthKind.Ok, 40)]
+    [InlineData(HealthKind.Warning, 85)]
+    [InlineData(HealthKind.Blocked, 100)]
+    [InlineData(HealthKind.Offline, 0)]
+    public void Tray_icon_is_drawn_in_the_health_colour(HealthKind health, double percent)
+    {
+        using var icon = IconRenderer.Render(percent, health);
+        Save(icon, $"tray-{health.ToString().ToLowerInvariant()}.png");
+
+        // The centre dot always carries the health colour.
+        var expected = IconRenderer.ColorFor(health);
+        var pixel = ReadPixel(icon, IconRenderer.Size / 2, IconRenderer.Size / 2);
+        Assert.InRange(Math.Abs(pixel.R - expected.R), 0, 3);
+        Assert.InRange(Math.Abs(pixel.G - expected.G), 0, 3);
+        Assert.InRange(Math.Abs(pixel.B - expected.B), 0, 3);
+    }
+
+    private static Bitmap Save(Bitmap? bitmap, string name)
+    {
+        Assert.NotNull(bitmap);
+        bitmap.Save(Path.Combine(Fixtures.ScreenshotDirectory(), name), PngBitmapEncoderOptions.Default);
+        return bitmap;
+    }
+
+    private static (byte R, byte G, byte B) ReadPixel(Bitmap bitmap, int x, int y)
+    {
+        var buffer = new byte[4];
+        unsafe
+        {
+            fixed (byte* p = buffer)
+            {
+                bitmap.CopyPixels(new Avalonia.PixelRect(x, y, 1, 1), (nint)p, buffer.Length, 4);
+            }
+        }
+
+        // Skia's default is BGRA premultiplied; the centre dot is opaque so premultiplication is a no-op.
+        return (buffer[2], buffer[1], buffer[0]);
+    }
+}

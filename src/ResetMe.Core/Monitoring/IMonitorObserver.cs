@@ -31,6 +31,12 @@ public sealed record LimitNotice(CodexUsage Usage, LimitAssessment Assessment, L
 /// </summary>
 public interface IMonitorObserver
 {
+    /// <summary>
+    /// False when nobody can answer a prompt (headless daemon, redirected stdin): confirm mode then
+    /// only reports the limit instead of asking.
+    /// </summary>
+    bool CanConfirm => true;
+
     void OnUsage(CodexUsage usage, LimitAssessment assessment);
 
     void OnLimitReached(LimitNotice notice);

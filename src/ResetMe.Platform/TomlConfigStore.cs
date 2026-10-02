@@ -45,6 +45,72 @@ public sealed class TomlConfigStore
         return true;
     }
 
+    /// <summary>
+    /// Writes <paramref name="options"/> as a complete, commented config.toml (atomic replace).
+    /// Hand-written comments are not preserved; the template's comments are.
+    /// </summary>
+    public void Save(GuardOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        var directory = System.IO.Path.GetDirectoryName(_path)!;
+        Directory.CreateDirectory(directory);
+        var temp = System.IO.Path.Combine(directory, $".config.{Environment.ProcessId}.tmp");
+        File.WriteAllText(temp, Render(options));
+        FilePermissions.RestrictToCurrentUser(temp, isDirectory: false);
+        File.Move(temp, _path, overwrite: true);
+    }
+
+    internal static string Render(GuardOptions o)
+    {
+        static string B(bool value) => value ? "true" : "false";
+        static string S(string value) => "\"" + value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal) + "\"";
+        static string L(string value) => value.ToLowerInvariant();
+
+        return $"""
+            # ResetMe configuration
+            # mode: "manual" | "confirm" | "automatic"   (automatic must be enabled explicitly)
+            mode = {S(L(o.Mode.ToString()))}
+
+            [monitor]
+            enabled = {B(o.Monitor.Enabled)}
+            interval_seconds = {o.Monitor.IntervalSeconds}          # minimum 10
+
+            [limits]
+            # Offer a reset when this window is the one blocking you.
+            five_hour = {B(o.Limits.FiveHour)}
+            weekly = {B(o.Limits.Weekly)}
+
+            [notifications]
+            enabled = {B(o.NotificationsEnabled)}
+
+            [reset]
+            cooldown_seconds = {o.Reset.CooldownSeconds}
+            verify_after_seconds = {o.Reset.VerifyAfterSeconds}
+            verify_interval_seconds = {o.Reset.VerifyIntervalSeconds}
+            verify_timeout_seconds = {o.Reset.VerifyTimeoutSeconds}
+            # Do not offer a reset if the limit lifts on its own sooner than this.
+            min_time_to_natural_reset_minutes = {o.Reset.MinTimeToNaturalResetMinutes}
+            # Extra consume tries with the SAME idempotency key after a timeout.
+            consume_retry_max = {o.Reset.ConsumeRetryMax}
+
+            [automatic]
+            max_resets_per_day = {o.Automatic.MaxResetsPerDay}
+            max_resets_per_week = {o.Automatic.MaxResetsPerWeek}
+
+            [logging]
+            # error | warning | information | debug | trace
+            level = {S(L(o.Logging.Level.ToString()))}
+            retention_days = {o.Logging.RetentionDays}
+
+            [codex]
+            executable = {S(o.CodexExecutable)}                # empty = search PATH
+
+            [ui]
+            start_minimized = {B(o.StartMinimized)}         # desktop app starts in the tray / menu bar
+
+            """;
+    }
+
     internal static GuardOptions Map(ConfigFile file, List<string> warnings)
     {
         var options = new GuardOptions();
@@ -122,6 +188,7 @@ public sealed class TomlConfigStore
         }
 
         options.CodexExecutable = file.Codex?.Executable ?? options.CodexExecutable;
+        options.StartMinimized = file.Ui?.StartMinimized ?? options.StartMinimized;
         return options;
     }
 
@@ -141,46 +208,7 @@ public sealed class TomlConfigStore
         return value.Value;
     }
 
-    internal const string DefaultToml = """
-        # ResetMe configuration
-        # mode: "manual" | "confirm" | "automatic"   (automatic must be enabled explicitly)
-        mode = "confirm"
-
-        [monitor]
-        enabled = true
-        interval_seconds = 30          # minimum 10
-
-        [limits]
-        # Offer a reset when this window is the one blocking you.
-        five_hour = true
-        weekly = true
-
-        [notifications]
-        enabled = true
-
-        [reset]
-        cooldown_seconds = 120
-        verify_after_seconds = 3
-        verify_interval_seconds = 5
-        verify_timeout_seconds = 120
-        # Do not offer a reset if the limit lifts on its own sooner than this.
-        min_time_to_natural_reset_minutes = 15
-        # Extra consume tries with the SAME idempotency key after a timeout.
-        consume_retry_max = 3
-
-        [automatic]
-        max_resets_per_day = 1
-        max_resets_per_week = 2
-
-        [logging]
-        # error | warning | information | debug | trace
-        level = "information"
-        retention_days = 14
-
-        [codex]
-        executable = ""                # empty = search PATH
-
-        """;
+    internal static readonly string DefaultToml = Render(new GuardOptions());
 }
 
 internal sealed class ConfigFile

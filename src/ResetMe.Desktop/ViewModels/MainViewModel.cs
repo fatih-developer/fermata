@@ -1,0 +1,236 @@
+using System.Collections.ObjectModel;
+using System.Globalization;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using ResetMe.Core.Domain;
+using ResetMe.Core.Monitoring;
+using ResetMe.Core.Policies;
+
+namespace ResetMe.Desktop.ViewModels;
+
+/// <summary>Traffic-light state shared by the window and the tray icon.</summary>
+public enum HealthKind
+{
+    Starting,
+    Ok,
+    Warning,
+    Blocked,
+    Offline,
+}
+
+/// <summary>
+/// Everything the window and tray show (PRD §11, §37). UI-framework free so it can be unit tested;
+/// the host injects the actions behind the commands.
+/// </summary>
+public sealed partial class MainViewModel : ObservableObject
+{
+    public const int MaxEvents = 50;
+    public const double WarningPercent = 80;
+
+    private readonly Func<Task> _resetNow;
+    private readonly Func<Task> _saveSettings;
+    private readonly Action _openLogs;
+
+    public MainViewModel(Func<Task> resetNow, Func<Task> saveSettings, Action openLogs)
+    {
+        _resetNow = resetNow;
+        _saveSettings = saveSettings;
+        _openLogs = openLogs;
+    }
+
+    public ObservableCollection<string> Events { get; } = [];
+
+    public static IReadOnlyList<string> ModeNames { get; } = ["Manual", "Confirm", "Automatic"];
+
+    [ObservableProperty]
+    public partial double FiveHourPercent { get; set; }
+
+    [ObservableProperty]
+    public partial string FiveHourText { get; set; } = "–";
+
+    [ObservableProperty]
+    public partial string FiveHourResetText { get; set; } = "";
+
+    [ObservableProperty]
+    public partial double WeeklyPercent { get; set; }
+
+    [ObservableProperty]
+    public partial string WeeklyText { get; set; } = "–";
+
+    [ObservableProperty]
+    public partial string WeeklyResetText { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string CreditsText { get; set; } = "–";
+
+    [ObservableProperty]
+    public partial string CreditExpiryText { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string StatusText { get; set; } = "Connecting to Codex…";
+
+    [ObservableProperty]
+    public partial string StatusDetail { get; set; } = "";
+
+    [ObservableProperty]
+    public partial HealthKind Health { get; set; } = HealthKind.Starting;
+
+    [ObservableProperty]
+    public partial string LastUpdatedText { get; set; } = "";
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ResetNowCommand))]
+    public partial bool CanResetNow { get; set; }
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ResetNowCommand))]
+    public partial bool IsBusy { get; set; }
+
+    // Settings (PRD §20)
+    [ObservableProperty]
+    public partial int ModeIndex { get; set; } = 1;
+
+    [ObservableProperty]
+    public partial decimal IntervalSeconds { get; set; } = 30;
+
+    [ObservableProperty]
+    public partial decimal MinNaturalResetMinutes { get; set; } = 15;
+
+    [ObservableProperty]
+    public partial bool NotificationsEnabled { get; set; } = true;
+
+    [ObservableProperty]
+    public partial bool StartAtLogin { get; set; }
+
+    [ObservableProperty]
+    public partial bool StartMinimized { get; set; } = true;
+
+    [ObservableProperty]
+    public partial string SettingsMessage { get; set; } = "";
+
+    /// <summary>Highest of the two windows; drives the tray icon ring.</summary>
+    public double PeakPercent => Math.Max(FiveHourPercent, WeeklyPercent);
+
+    public string TrayToolTip => Health switch
+    {
+        HealthKind.Offline => $"ResetMe — {StatusText}",
+        HealthKind.Starting => "ResetMe — connecting…",
+        _ => $"ResetMe — 5h {FiveHourText} · weekly {WeeklyText} · resets {CreditsText}",
+    };
+
+    public void ApplyUsage(CodexUsage usage, LimitAssessment assessment, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(usage);
+        ArgumentNullException.ThrowIfNull(assessment);
+
+        FiveHourPercent = Clamp(usage.FiveHour?.UsedPercent);
+        FiveHourText = Percent(usage.FiveHour);
+        FiveHourResetText = ResetsIn(usage.FiveHour, now);
+        WeeklyPercent = Clamp(usage.Weekly?.UsedPercent);
+        WeeklyText = Percent(usage.Weekly);
+        WeeklyResetText = ResetsIn(usage.Weekly, now);
+        CreditsText = usage.ResetCreditsReported ? usage.AvailableResetCount.ToString(CultureInfo.InvariantCulture) : "n/a";
+        CreditExpiryText = LimitEvaluator.SelectCredit(usage.Credits)?.ExpiresAt is { } expires
+            ? $"next expires in {NotificationTexts.Duration(expires - now)}"
+            : "";
+
+        if (assessment.Blocked)
+        {
+            Health = HealthKind.Blocked;
+            StatusText = "Limit reached";
+            StatusDetail = assessment.NoOfferReason switch
+            {
+                null => "A reset credit can be used.",
+                NoOfferReason.NoCredit => "No reset credits left.",
+                NoOfferReason.NaturalResetSoon when assessment.NaturalUnblockAt is { } at => $"Lifts on its own in {NotificationTexts.Duration(at - now)}.",
+                NoOfferReason.WorkspaceLimit => "Workspace limit: reset credits do not apply.",
+                NoOfferReason.WindowDisabled => "This window is disabled in settings.",
+                _ => "",
+            };
+        }
+        else
+        {
+            Health = PeakPercent >= WarningPercent ? HealthKind.Warning : HealthKind.Ok;
+            StatusText = usage.UsageAllowed is null ? "Monitoring (usage flag not reported)" : "Monitoring";
+            StatusDetail = "";
+        }
+
+        CanResetNow = assessment.Blocked && usage.AvailableResetCount > 0 && !usage.IsWorkspaceLimit;
+        LastUpdatedText = $"Updated {now.ToLocalTime():HH:mm:ss}";
+        OnPropertyChanged(nameof(PeakPercent));
+        OnPropertyChanged(nameof(TrayToolTip));
+    }
+
+    public void SetOffline(string status, string detail)
+    {
+        Health = HealthKind.Offline;
+        StatusText = status;
+        StatusDetail = detail;
+        CanResetNow = false;
+        OnPropertyChanged(nameof(TrayToolTip));
+    }
+
+    public void AddEvent(string text, DateTimeOffset at)
+    {
+        Events.Insert(0, $"{at.ToLocalTime():HH:mm}  {text}");
+        while (Events.Count > MaxEvents)
+        {
+            Events.RemoveAt(Events.Count - 1);
+        }
+    }
+
+    public void LoadSettings(GuardOptions options, bool startAtLogin)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        ModeIndex = (int)options.Mode;
+        IntervalSeconds = options.Monitor.IntervalSeconds;
+        MinNaturalResetMinutes = options.Reset.MinTimeToNaturalResetMinutes;
+        NotificationsEnabled = options.NotificationsEnabled;
+        StartMinimized = options.StartMinimized;
+        StartAtLogin = startAtLogin;
+    }
+
+    /// <summary>Copies the editable settings onto <paramref name="current"/>, keeping everything else.</summary>
+    public GuardOptions ApplySettings(GuardOptions current)
+    {
+        ArgumentNullException.ThrowIfNull(current);
+        current.Mode = (GuardMode)Math.Clamp(ModeIndex, 0, 2);
+        current.Monitor.IntervalSeconds = Math.Max(MonitorOptions.MinimumIntervalSeconds, (int)IntervalSeconds);
+        current.Reset.MinTimeToNaturalResetMinutes = Math.Max(0, (int)MinNaturalResetMinutes);
+        current.NotificationsEnabled = NotificationsEnabled;
+        current.StartMinimized = StartMinimized;
+        return current;
+    }
+
+    partial void OnHealthChanged(HealthKind value) => OnPropertyChanged(nameof(TrayToolTip));
+
+    [RelayCommand(CanExecute = nameof(CanExecuteResetNow))]
+    private async Task ResetNowAsync()
+    {
+        IsBusy = true;
+        try
+        {
+            await _resetNow().ConfigureAwait(true);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private bool CanExecuteResetNow() => CanResetNow && !IsBusy;
+
+    [RelayCommand]
+    private Task SaveSettingsAsync() => _saveSettings();
+
+    [RelayCommand]
+    private void OpenLogs() => _openLogs();
+
+    private static double Clamp(double? percent) => Math.Clamp(percent ?? 0, 0, 100);
+
+    private static string Percent(UsageWindow? window) =>
+        window is null ? "n/a" : string.Create(CultureInfo.InvariantCulture, $"{window.UsedPercent:0}%");
+
+    private static string ResetsIn(UsageWindow? window, DateTimeOffset now) =>
+        window?.ResetsAt is { } at ? $"resets in {NotificationTexts.Duration(at - now)}" : "";
+}

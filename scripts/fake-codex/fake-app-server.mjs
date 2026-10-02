@@ -20,11 +20,13 @@ const now = () => Math.floor(Date.now() / 1000);
 const statePath = process.env.FAKE_CODEX_STATE;
 const logPath = process.env.FAKE_CODEX_LOG;
 
-let state = { resetDone: false, credits: 2, redeemedKeys: [] };
+// Like the real backend, window reset times are fixed instants, not "now + duration" per read.
+let state = { resetDone: false, credits: 2, redeemedKeys: [], epoch: now() };
 if (statePath && fs.existsSync(statePath)) state = JSON.parse(fs.readFileSync(statePath, "utf8"));
+state.epoch ??= now();
 const save = () => statePath && fs.writeFileSync(statePath, JSON.stringify(state));
 
-const window = (used, mins, resetsIn) => ({ usedPercent: used, windowDurationMins: mins, resetsAt: now() + resetsIn });
+const window = (used, mins, resetsIn) => ({ usedPercent: used, windowDurationMins: mins, resetsAt: state.epoch + resetsIn });
 
 function rateLimits(params) {
   const blocked = !state.resetDone;
@@ -61,6 +63,7 @@ function consume(params) {
   else {
     state.credits -= 1;
     state.resetDone = true;
+    state.epoch = now(); // fresh windows start at the reset
     state.redeemedKeys.push(params.idempotencyKey);
     outcome = "reset";
   }

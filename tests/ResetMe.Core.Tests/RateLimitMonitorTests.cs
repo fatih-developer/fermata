@@ -101,6 +101,19 @@ public sealed class RateLimitMonitorTests : IDisposable
     }
 
     [Fact]
+    public async Task Confirm_mode_only_reports_when_nobody_can_answer()
+    {
+        _observer.CanConfirm = false; // headless daemon / redirected stdin
+        _client.FallbackUsage = Usage.Blocked();
+
+        await RunUntil(o => o.UsageReads >= 3);
+
+        Assert.Equal(LimitHandling.ReportOnly, Assert.Single(_observer.Notices).Handling);
+        Assert.Equal(0, _observer.Questions);
+        Assert.Empty(_client.ConsumeCalls);
+    }
+
+    [Fact]
     public async Task Manual_mode_only_reports()
     {
         _options.Mode = GuardMode.Manual;
@@ -250,6 +263,8 @@ public sealed class RateLimitMonitorTests : IDisposable
         private CancellationTokenSource? _stop;
 
         public bool Answer { get; set; }
+
+        public bool CanConfirm { get; set; } = true;
 
         public Action? OnFirstUsage { get; set; }
 

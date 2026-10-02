@@ -155,6 +155,17 @@ public class LimitEvaluatorTests
     }
 
     [Fact]
+    public void Event_id_tolerates_reset_time_jitter()
+    {
+        var first = Usage.Blocked(fiveHour: 100);
+        var jittered = first with { FiveHour = first.FiveHour! with { ResetsAt = first.FiveHour.ResetsAt!.Value.AddSeconds(40) } };
+
+        Assert.Equal(
+            LimitEvaluator.ComputeLimitEventId(first, LimitEvaluator.ExhaustedWindows(first)),
+            LimitEvaluator.ComputeLimitEventId(jittered, LimitEvaluator.ExhaustedWindows(jittered)));
+    }
+
+    [Fact]
     public void Event_id_changes_when_the_window_rolls_over()
     {
         var first = Usage.Blocked(fiveHour: 100);

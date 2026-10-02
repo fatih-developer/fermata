@@ -25,8 +25,21 @@ reset.SetAction((parse, ct) => Guarded("reset", () => ResetCommand.RunAsync(
 var watch = new Command("watch", "Monitor usage and offer a reset when a limit is reached (Ctrl+C to stop).");
 watch.SetAction((_, ct) => Guarded("watch", () => WatchCommand.RunAsync(ct)));
 
-var doctor = new Command("doctor", "Check installation, Codex connectivity and reset capability.");
-doctor.SetAction((_, ct) => Guarded("doctor", () => DoctorCommand.RunAsync(ct)));
+var notifyTest = new Option<bool>("--notify") { Description = "Also send a test desktop notification." };
+var doctor = new Command("doctor", "Check installation, Codex connectivity and reset capability.") { notifyTest };
+doctor.SetAction((parse, ct) => Guarded("doctor", () => DoctorCommand.RunAsync(parse.GetValue(notifyTest), ct)));
+
+var daemon = new Command("daemon", "Run the monitor headless (for login services, SSH and servers). Never prompts.");
+daemon.SetAction((_, ct) => Guarded("daemon", () => DaemonCommand.RunAsync(ct)));
+
+var autostartAction = new Argument<string>("action") { Description = "status | enable | disable", DefaultValueFactory = _ => "status" };
+autostartAction.AcceptOnlyFromAmong("status", "enable", "disable");
+var autostartTarget = new Option<string?>("--target") { Description = "desktop (tray app) or daemon (headless). Default: desktop, or daemon on headless Linux." };
+autostartTarget.AcceptOnlyFromAmong("desktop", "daemon");
+var autostartPath = new Option<string?>("--path") { Description = "Executable to start (default: the installed app next to resetme)." };
+var autostart = new Command("autostart", "Start ResetMe at login.") { autostartAction, autostartTarget, autostartPath };
+autostart.SetAction((parse, ct) => Guarded("autostart", () => AutostartCommand.RunAsync(
+    parse.GetValue(autostartAction)!, parse.GetValue(autostartTarget), parse.GetValue(autostartPath), ct)));
 
 var init = new Option<bool>("--init") { Description = "Create config.toml with defaults if missing." };
 var config = new Command("config", "Show the effective configuration.") { init };
@@ -40,6 +53,8 @@ root.Subcommands.Add(status);
 root.Subcommands.Add(watch);
 root.Subcommands.Add(reset);
 root.Subcommands.Add(doctor);
+root.Subcommands.Add(daemon);
+root.Subcommands.Add(autostart);
 root.Subcommands.Add(config);
 
 var logs = new Command("logs", "Show recent log entries.") { tail, logsJson, logsPath };

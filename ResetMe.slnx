@@ -3,10 +3,12 @@
     <Project Path="src/ResetMe.Cli/ResetMe.Cli.csproj" />
     <Project Path="src/ResetMe.Codex/ResetMe.Codex.csproj" />
     <Project Path="src/ResetMe.Core/ResetMe.Core.csproj" />
+    <Project Path="src/ResetMe.Desktop/ResetMe.Desktop.csproj" />
     <Project Path="src/ResetMe.Platform/ResetMe.Platform.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/ResetMe.Codex.Tests/ResetMe.Codex.Tests.csproj" />
     <Project Path="tests/ResetMe.Core.Tests/ResetMe.Core.Tests.csproj" />
+    <Project Path="tests/ResetMe.Desktop.Tests/ResetMe.Desktop.Tests.csproj" />
   </Folder>
 </Solution>

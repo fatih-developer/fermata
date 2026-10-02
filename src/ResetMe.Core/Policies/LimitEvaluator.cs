@@ -171,7 +171,11 @@ public static class LimitEvaluator
         var builder = new StringBuilder(usage.AccountId ?? "unknown-account");
         foreach (var kind in kinds.Order())
         {
-            var resetsAt = Window(usage, kind)?.ResetsAt?.ToUnixTimeSeconds();
+            // Rounded to the nearest hour: tolerant of backend jitter, while two episodes of the
+            // same window are always at least five hours apart.
+            var resetsAt = Window(usage, kind)?.ResetsAt?.ToUnixTimeSeconds() is { } seconds
+                ? (seconds + 1800) / 3600
+                : (long?)null;
             builder.Append('|').Append(kind).Append(':')
                 .Append(resetsAt?.ToString(CultureInfo.InvariantCulture) ?? "?");
         }
