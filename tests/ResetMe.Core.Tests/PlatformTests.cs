@@ -133,12 +133,17 @@ public sealed class PlatformTests : IDisposable
         var entered = new TaskCompletionSource();
         var release = new TaskCompletionSource();
 
+        // Fixed clock: the fixtures' reset times are relative to Usage.Now, not to the wall clock.
+        var time = new SteppingTimeProvider(Usage.Now);
         var slow = new BlockingClient(release.Task, entered);
-        var managerA = new ResetManager(slow, store, resetLock, options, TimeProvider.System);
-        var managerB = new ResetManager(new BlockingClient(Task.CompletedTask), store, resetLock, options, TimeProvider.System);
+        var managerA = new ResetManager(slow, store, resetLock, options, time);
+        var managerB = new ResetManager(new BlockingClient(Task.CompletedTask), store, resetLock, options, time);
 
         var runA = managerA.ExecuteAsync(new ResetRequest(), CancellationToken.None);
-        await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        if (await Task.WhenAny(entered.Task, runA).WaitAsync(TimeSpan.FromSeconds(10)) == runA)
+        {
+            Assert.Fail($"Run A finished before consuming: {(await runA).Status}");
+        }
 
         var reportB = await managerB.ExecuteAsync(new ResetRequest(), CancellationToken.None);
         release.SetResult();

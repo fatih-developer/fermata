@@ -68,11 +68,10 @@ public sealed class AppServerProcess : IDisposable
 
         if (CodexLocator.NeedsShell(executable))
         {
+            // cmd.exe has its own quoting rules: ArgumentList would escape quotes as \" which cmd
+            // does not understand, so the command line is passed verbatim. /s strips the outer quotes.
             info.FileName = Environment.GetEnvironmentVariable("ComSpec") ?? "cmd.exe";
-            info.ArgumentList.Add("/d");
-            info.ArgumentList.Add("/s");
-            info.ArgumentList.Add("/c");
-            info.ArgumentList.Add($"\"\"{executable}\" app-server\"");
+            info.Arguments = $"/d /s /c \"\"{executable}\" app-server\"";
         }
         else
         {

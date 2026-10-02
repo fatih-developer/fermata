@@ -20,6 +20,9 @@ var reset = new Command("reset", "Redeem one reset credit when Codex is rate-lim
 reset.SetAction((parse, ct) => Guarded(() => ResetCommand.RunAsync(
     parse.GetValue(yes), parse.GetValue(force), parse.GetValue(verbose), ct)));
 
+var watch = new Command("watch", "Monitor usage and offer a reset when a limit is reached (Ctrl+C to stop).");
+watch.SetAction((_, ct) => Guarded(() => WatchCommand.RunAsync(ct)));
+
 var doctor = new Command("doctor", "Check installation, Codex connectivity and reset capability.");
 doctor.SetAction((_, ct) => Guarded(() => DoctorCommand.RunAsync(ct)));
 
@@ -28,6 +31,7 @@ var config = new Command("config", "Show the effective configuration.") { init }
 config.SetAction(parse => ConfigCommand.Run(parse.GetValue(init)));
 
 root.Subcommands.Add(status);
+root.Subcommands.Add(watch);
 root.Subcommands.Add(reset);
 root.Subcommands.Add(doctor);
 root.Subcommands.Add(config);

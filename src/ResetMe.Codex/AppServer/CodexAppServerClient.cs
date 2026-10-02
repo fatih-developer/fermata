@@ -26,7 +26,7 @@ public sealed class CodexUnavailableException : Exception
 /// <summary>
 /// <see cref="ICodexUsageClient"/> on top of the Codex App Server (docs/CODEX_INTEGRATION.md).
 /// </summary>
-public sealed class CodexAppServerClient : ICodexUsageClient, IAsyncDisposable
+public sealed class CodexAppServerClient : ICodexConnection
 {
     internal const string ClientName = "resetme";
 
@@ -49,7 +49,7 @@ public sealed class CodexAppServerClient : ICodexUsageClient, IAsyncDisposable
     }
 
     /// <summary>Raised when the server pushes <c>account/rateLimits/updated</c>; callers should re-read.</summary>
-    public event Action? RateLimitsChanged;
+    public event Action? UsageChanged;
 
     /// <summary>Raised on <c>account/updated</c> (login, logout, plan change).</summary>
     public event Action? AccountChanged;
@@ -215,7 +215,7 @@ public sealed class CodexAppServerClient : ICodexUsageClient, IAsyncDisposable
         switch (method)
         {
             case "account/rateLimits/updated":
-                RateLimitsChanged?.Invoke();
+                UsageChanged?.Invoke();
                 break;
             case "account/updated":
                 AccountChanged?.Invoke();

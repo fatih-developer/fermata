@@ -7,7 +7,7 @@ Codex'in 5 saatlik veya haftalık kullanım limiti dolduğunda bunu tespit eden 
 
 ## Durum
 
-MVP-1 geliştirme aşamasında. Hazır olanlar: `status`, `reset`, `doctor`, `config`. Sıradaki: `watch`.
+MVP-1 geliştirme aşamasında. Hazır olanlar: `status`, `watch`, `reset`, `doctor`, `config`. Sıradaki: dosyaya loglama, ardından MVP-2 (arka plan servisi, bildirimler).
 
 ## Gereksinimler
 
@@ -18,11 +18,14 @@ MVP-1 geliştirme aşamasında. Hazır olanlar: `status`, `reset`, `doctor`, `co
 
 ```bash
 dotnet run --project src/ResetMe.Cli -- status
+dotnet run --project src/ResetMe.Cli -- watch          # izler, limit dolunca [y/N] sorar
 dotnet run --project src/ResetMe.Cli -- status --json
 dotnet run --project src/ResetMe.Cli -- doctor
 dotnet run --project src/ResetMe.Cli -- config --init
 dotnet run --project src/ResetMe.Cli -- reset          # onay ister
 ```
+
+`watch` her limit olayı için en fazla bir kez sorar. "Hayır" derseniz aynı limit için tekrar sormaz. Soru beklerken izleme duraklar. `mode = "automatic"` ayarıyla onay istemeden reset yapar; günlük ve haftalık sınırlar ile cooldown geçerlidir.
 
 `reset` yalnızca Codex gerçekten limitteyken kredi kullanır. Limit 15 dakikadan kısa sürede kendiliğinden açılacaksa teklif etmez (`--force` ile geçilebilir).
 
@@ -45,4 +48,16 @@ Windows 11'de Smart App Control açıksa imzasız geliştirme build'leri engelle
 
 ```bash
 dotnet test
+scripts/test-in-docker.sh        # Linux konteynerinde (Smart App Control engelinden etkilenmez)
 ```
+
+### Gerçek kredi harcamadan uçtan uca deneme
+
+`scripts/fake-codex/`, limitte olan bir hesabı taklit eden sahte bir `codex app-server` içerir (Node.js gerekir). `config.toml`:
+
+```toml
+[codex]
+executable = "C:/path/to/repo/scripts/fake-codex/codex.cmd"   # macOS/Linux: .../fake-codex/codex
+```
+
+`FAKE_CODEX_STATE` durumu çalıştırmalar arasında saklar, `FAKE_CODEX_LOG` her `consume` çağrısını bir satır olarak yazar.

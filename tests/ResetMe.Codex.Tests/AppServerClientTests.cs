@@ -117,7 +117,7 @@ public sealed class AppServerClientTests : IAsyncDisposable
     {
         await using var client = await Connect();
         var changed = new TaskCompletionSource();
-        client.RateLimitsChanged += () => changed.TrySetResult();
+        client.UsageChanged += () => changed.TrySetResult();
 
         await _server.NotifyAsync("account/rateLimits/updated", new JsonObject { ["rateLimits"] = new JsonObject() });
 
