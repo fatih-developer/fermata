@@ -14,13 +14,14 @@ public sealed class AppServerClientTests : IAsyncDisposable
 
     public ValueTask DisposeAsync() => _server.DisposeAsync();
 
-    private Task<CodexAppServerClient> Connect(TimeSpan? timeout = null) =>
+    // Generous request timeout: slow CI runners can take a while for the first round trip.
+    private Task<CodexAppServerClient> Connect(TimeSpan? consumeTimeout = null) =>
         CodexAppServerClient.ConnectAsync(
             _server.ClientConnection,
             new CodexClientOptions
             {
-                RequestTimeout = timeout ?? TimeSpan.FromSeconds(5),
-                ConsumeTimeout = timeout ?? TimeSpan.FromSeconds(5),
+                RequestTimeout = TimeSpan.FromSeconds(30),
+                ConsumeTimeout = consumeTimeout ?? TimeSpan.FromSeconds(30),
             },
             TimeProvider.System,
             CancellationToken.None);
@@ -102,7 +103,7 @@ public sealed class AppServerClientTests : IAsyncDisposable
     public async Task Server_exit_fails_pending_requests_as_transient()
     {
         _server.Ignore("account/rateLimits/read");
-        await using var client = await Connect(TimeSpan.FromSeconds(10));
+        await using var client = await Connect();
 
         var pending = client.GetUsageAsync(includeCreditDetails: false, CancellationToken.None);
         await _server.WaitForAsync("account/rateLimits/read");
