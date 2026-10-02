@@ -43,7 +43,7 @@ codex app-server daemon start|stop|version
 
 ```jsonc
 → {"jsonrpc":"2.0","id":1,"method":"initialize","params":{
-     "clientInfo":{"name":"codex-reset-guard","title":null,"version":"x.y.z"},
+     "clientInfo":{"name":"resetme","title":null,"version":"x.y.z"},
      "capabilities":{"experimentalApi":false,"requestAttestation":false}}}
 ← {"id":1,"result":{"userAgent":"...","codexHome":"C:\\Users\\<user>\\.codex",
      "platformFamily":"windows","platformOs":"windows"}}
@@ -54,7 +54,7 @@ Başlatmadan hemen sonra sunucu kendiliğinden `account/updated` (authMode, plan
 
 ### Lifecycle kararı (MVP-1)
 
-Reset Guard **kendi `codex app-server` child process'ini stdio üzerinden başlatır**. Gerekçeler:
+ResetMe **kendi `codex app-server` child process'ini stdio üzerinden başlatır**. Gerekçeler:
 
 - Ek kurulum veya daemon gerektirmez, her üç platformda aynı şekilde çalışır.
 - Auth, `codexHome` (`~/.codex`) üzerinden paylaşılır; ayrı login gerekmez.
@@ -169,7 +169,7 @@ result: { outcome: "reset" | "nothingToReset" | "noCredit" | "alreadyRedeemed" }
 
 ### Kredi seçimi
 
-`creditId` boş bırakılabilir. Ancak krediler süreli olduğu için Reset Guard `status == "available"` olan krediler arasından **`expiresAt` değeri en yakın olanı** açıkça seçer. Süresi dolmak üzere olan kredi önce kullanılır.
+`creditId` boş bırakılabilir. Ancak krediler süreli olduğu için ResetMe `status == "available"` olan krediler arasından **`expiresAt` değeri en yakın olanı** açıkça seçer. Süresi dolmak üzere olan kredi önce kullanılır.
 
 ---
 
@@ -193,7 +193,7 @@ Bu konular ancak gerçek bir limit olayında ve gerçek kredi tüketimiyle doğr
 4. Ayrı bir Codex sürecindeki kullanımın bu instance'a `account/rateLimits/updated` olarak gelip gelmediği.
 5. Polling sıklığının sunucu tarafında bir rate limit'e takılıp takılmadığı.
 
-**Öneri:** 1–3 numaralı maddeler, ilk gerçek limit olayında `codex-reset reset --verbose` ile kontrollü olarak gözlenip bu dokümana eklenmeli.
+**Öneri:** 1–3 numaralı maddeler, ilk gerçek limit olayında `resetme reset --verbose` ile kontrollü olarak gözlenip bu dokümana eklenmeli.
 
 ---
 

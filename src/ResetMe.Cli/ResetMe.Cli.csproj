@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>resetme</AssemblyName>
+    <RootNamespace>ResetMe.Cli</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ResetMe.Core\ResetMe.Core.csproj" />
+    <ProjectReference Include="..\ResetMe.Codex\ResetMe.Codex.csproj" />
+    <ProjectReference Include="..\ResetMe.Platform\ResetMe.Platform.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" Version="2.0.12" />
+  </ItemGroup>
+
+</Project>

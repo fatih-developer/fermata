@@ -34,7 +34,7 @@ function call(method, params) {
 }
 const notify = (method, params) => proc.stdin.write(JSON.stringify({ jsonrpc: "2.0", method, params }) + "\n");
 
-await call("initialize", { clientInfo: { name: "codex-reset-guard-probe", title: null, version: "0.0.1" }, capabilities: { experimentalApi: false, requestAttestation: false } });
+await call("initialize", { clientInfo: { name: "resetme-probe", title: null, version: "0.0.1" }, capabilities: { experimentalApi: false, requestAttestation: false } });
 notify("initialized", {});
 await call("account/read", { refreshToken: false });
 await call("account/rateLimits/read", {});
