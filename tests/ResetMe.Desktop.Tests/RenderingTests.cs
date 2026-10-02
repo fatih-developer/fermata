@@ -116,12 +116,14 @@ public class RenderingTests
         using var icon = IconRenderer.Render(percent, health);
         Save(icon, $"tray-{health.ToString().ToLowerInvariant()}.png");
 
-        // The centre dot always carries the health colour.
+        // The centre dot always carries the health colour. The platform default is BGRA on
+        // Windows/Linux and RGBA on macOS, so accept either channel order.
         var expected = IconRenderer.ColorFor(health);
-        var pixel = ReadPixel(icon, IconRenderer.Size / 2, IconRenderer.Size / 2);
-        Assert.InRange(Math.Abs(pixel.R - expected.R), 0, 3);
-        Assert.InRange(Math.Abs(pixel.G - expected.G), 0, 3);
-        Assert.InRange(Math.Abs(pixel.B - expected.B), 0, 3);
+        var (c0, c1, c2) = ReadPixel(icon, IconRenderer.Size / 2, IconRenderer.Size / 2);
+        static bool Near(byte a, byte b) => Math.Abs(a - b) <= 3;
+        var bgra = Near(c2, expected.R) && Near(c1, expected.G) && Near(c0, expected.B);
+        var rgba = Near(c0, expected.R) && Near(c1, expected.G) && Near(c2, expected.B);
+        Assert.True(bgra || rgba, $"centre pixel {c0},{c1},{c2} is not {expected}");
     }
 
     private static Bitmap Save(Bitmap? bitmap, string name)
@@ -131,7 +133,8 @@ public class RenderingTests
         return bitmap;
     }
 
-    private static (byte R, byte G, byte B) ReadPixel(Bitmap bitmap, int x, int y)
+    /// <summary>First three bytes of the pixel, in the bitmap's native channel order.</summary>
+    private static (byte C0, byte C1, byte C2) ReadPixel(Bitmap bitmap, int x, int y)
     {
         var buffer = new byte[4];
         unsafe
@@ -142,7 +145,6 @@ public class RenderingTests
             }
         }
 
-        // Skia's default is BGRA premultiplied; the centre dot is opaque so premultiplication is a no-op.
-        return (buffer[2], buffer[1], buffer[0]);
+        return (buffer[0], buffer[1], buffer[2]);
     }
 }
