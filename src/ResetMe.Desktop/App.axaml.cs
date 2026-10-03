@@ -52,7 +52,9 @@ public partial class App : Application, IDesktopUi
                 AutostartFactory.Create(),
                 options => NotifierFactory.Create(options.NotificationsEnabled),
                 _loggers,
-                TimeProvider.System);
+                TimeProvider.System,
+                new GitHubUpdateService());
+            _host.RequestExit = () => Dispatcher.UIThread.Post(() => desktop.Shutdown());
 
             _window = new MainWindow { DataContext = _host.ViewModel };
             UpdateWindowIcon();

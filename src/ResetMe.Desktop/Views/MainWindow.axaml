@@ -42,6 +42,15 @@
         </Grid>
       </Border>
 
+      <!-- Update -->
+      <Border CornerRadius="8" Padding="14" BorderBrush="#2E9E5B" BorderThickness="1" IsVisible="{Binding UpdateAvailable}">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Classes="hint" Text="{Binding UpdateText}" TextWrapping="Wrap" VerticalAlignment="Center" />
+          <Button Grid.Column="1" Content="Install update" Margin="12,0,0,0" Command="{Binding InstallUpdateCommand}"
+                  IsVisible="{Binding CanInstallUpdate}" />
+        </Grid>
+      </Border>
+
       <!-- Unresolved attempt -->
       <Border CornerRadius="8" Padding="14" BorderBrush="#D99A1E" BorderThickness="1" IsVisible="{Binding HasPendingAttempt}">
         <StackPanel Spacing="8">

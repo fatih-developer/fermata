@@ -123,6 +123,38 @@ internal sealed class FakeUi(bool answer, bool answerQuestions = false) : IDeskt
     }
 }
 
+internal sealed class FakeUpdates(string latest, bool canInstall = true) : IUpdateService
+{
+    public int Checks { get; private set; }
+
+    public int Installs { get; private set; }
+
+    public Exception? FailCheckWith { get; set; }
+
+    public bool CanInstall => canInstall;
+
+    public Task<Platform.Updates.UpdateCheckResult> CheckAsync(CancellationToken cancellationToken)
+    {
+        Checks++;
+        if (FailCheckWith is { } error)
+        {
+            throw error;
+        }
+
+        var pkg = new Platform.Updates.ReleaseAsset("resetme-test.zip", new Uri("https://dl.test/pkg"), 1);
+        var sums = new Platform.Updates.ReleaseAsset("SHA256SUMS.txt", new Uri("https://dl.test/sums"), 1);
+        var info = new Platform.Updates.ReleaseInfo("v" + latest, latest, new Uri("https://github.test/release"), [pkg, sums]);
+        var newer = Platform.Updates.UpdateChecker.CompareVersions(latest, "0.3.0") > 0;
+        return Task.FromResult(new Platform.Updates.UpdateCheckResult("0.3.0", info, newer, pkg, sums));
+    }
+
+    public Task<Platform.Updates.ApplyResult> InstallAsync(Platform.Updates.UpdateCheckResult check, IProgress<string> progress, CancellationToken cancellationToken)
+    {
+        Installs++;
+        return Task.FromResult(Platform.Updates.ApplyResult.Scheduled);
+    }
+}
+
 internal sealed class FakeAutostart : IAutostartManager
 {
     public AutostartEntry? Enabled { get; private set; }

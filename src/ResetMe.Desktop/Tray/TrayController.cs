@@ -19,6 +19,7 @@ public sealed class TrayController : IDisposable
     private readonly NativeMenuItem _credits = new() { IsEnabled = false };
     private readonly NativeMenuItem _status = new() { IsEnabled = false };
     private readonly NativeMenuItem _resetNow = new("Reset now…");
+    private readonly NativeMenuItem _update = new() { IsVisible = false };
     private readonly NativeMenuItem[] _modes;
     private HealthKind _iconHealth = (HealthKind)(-1);
     private int _iconBucket = -1;
@@ -27,6 +28,17 @@ public sealed class TrayController : IDisposable
     {
         _vm = vm;
         _resetNow.Click += (_, _) => vm.ResetNowCommand.Execute(null);
+        _update.Click += (_, _) =>
+        {
+            if (vm.InstallUpdateCommand.CanExecute(null))
+            {
+                vm.InstallUpdateCommand.Execute(null);
+            }
+            else
+            {
+                showWindow();
+            }
+        };
 
         _modes = [.. Enum.GetValues<GuardMode>().Select(mode =>
         {
@@ -57,6 +69,7 @@ public sealed class TrayController : IDisposable
         menu.Items.Add(_credits);
         menu.Items.Add(new NativeMenuItemSeparator());
         menu.Items.Add(_resetNow);
+        menu.Items.Add(_update);
         menu.Items.Add(new NativeMenuItem("Mode") { Menu = modeMenu });
         menu.Items.Add(open);
         menu.Items.Add(logs);
@@ -98,6 +111,8 @@ public sealed class TrayController : IDisposable
         }
 
         _tray.ToolTipText = _vm.TrayToolTip;
+        _update.IsVisible = _vm.UpdateAvailable;
+        _update.Header = $"Install ResetMe {_vm.UpdateVersion}…";
 
         // Redraw only when the visible state changes (5% steps).
         var bucket = (int)(_vm.PeakPercent / 5);

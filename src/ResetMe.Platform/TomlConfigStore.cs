@@ -98,6 +98,10 @@ public sealed class TomlConfigStore
             enabled = {B(o.NearLimit.Enabled)}
             thresholds = [{string.Join(", ", o.NearLimit.Thresholds)}]
 
+            [updates]
+            # Once a day the desktop app reads the public GitHub release feed (no user data is sent).
+            check_automatically = {B(o.Updates.CheckAutomatically)}
+
             [automatic]
             max_resets_per_day = {o.Automatic.MaxResetsPerDay}
             max_resets_per_week = {o.Automatic.MaxResetsPerWeek}
@@ -181,6 +185,8 @@ public sealed class TomlConfigStore
             }
         }
 
+        options.Updates.CheckAutomatically = file.Updates?.CheckAutomatically ?? options.Updates.CheckAutomatically;
+
         if (file.Automatic is { } automatic)
         {
             var a = options.Automatic;
@@ -247,6 +253,8 @@ internal sealed class ConfigFile
 
     public NearLimitSection? NearLimit { get; set; }
 
+    public UpdatesSection? Updates { get; set; }
+
     public CodexSection? Codex { get; set; }
 
     public LoggingSection? Logging { get; set; }
@@ -293,6 +301,11 @@ internal sealed class ResetSection
     public int? MinTimeToNaturalResetMinutes { get; set; }
 
     public int? ConsumeRetryMax { get; set; }
+}
+
+internal sealed class UpdatesSection
+{
+    public bool? CheckAutomatically { get; set; }
 }
 
 internal sealed class NearLimitSection

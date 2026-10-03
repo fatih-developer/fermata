@@ -1373,6 +1373,18 @@ Uygulamanın çalıştırılabilir adı `ResetMeApp`'tir: `ResetMe` adı, büyü
 
 Automation improvements.
 
+**Durum (2026-10-03):** Aşağıdaki maddeler uygulandı. Release'lerin imzalanması (Authenticode, notarization) ayrı iş olarak kalıyor (§43).
+
+| Madde | Uygulama |
+|---|---|
+| Automatic mode | Masaüstünde açık onay penceresi (korumalar listelenir); reddedilirse önceki moda döner. CLI'da `config.toml` ile. |
+| Near-limit warnings | `[near_limit]` (varsayılan 80/90/95). Eşik başına pencere dönemi içinde bir kez; aynı anda birden fazla eşik geçilirse yalnızca en yükseği. Terminal, daemon logu, masaüstü olayları ve bildirim. |
+| Better retry/recovery | Yarım kalan deneme başlangıçta bildirilir, masaüstünde "Finish pending reset" (aynı idempotency key). `state.json.bak` ile bozuk durum dosyasından kurtarma. Yeniden bağlanma 1 sn → 5 dk, log seyreltme. Eşzamanlı log yazımında satır kaybı düzeltildi. |
+| Self-update | `resetme update [--check]`, masaüstünde günde bir kontrol + "Install update". GitHub Releases + `SHA256SUMS.txt` doğrulaması; Unix'te yerinde klasör değişimi, Windows'ta çıkıştan sonra çalışan yardımcı (hata olursa geri alma). Geliştirme derlemeleri hiçbir zaman değiştirilmez. `[updates] check_automatically`. Release: `v*` tag'i → `.github/workflows/release.yml`. |
+| Diagnostics export | `resetme diagnostics`, masaüstünde "Export diagnostics": sistem bilgisi, config, state, son 7 günün logları, doctor çıktısı. Yeniden temizlenir; kullanıcı profili yolu `~` olur. |
+
+Güncelleme kontrolü, ResetMe'nin Codex dışındaki tek ağ isteğidir: herkese açık GitHub release bilgisini okur, kullanıcıya ait veri göndermez (User-Agent yalnızca sürümü içerir).
+
 - Automatic mode
 - Near-limit warnings
 - Better retry/recovery

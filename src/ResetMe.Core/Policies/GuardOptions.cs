@@ -22,6 +22,8 @@ public sealed class GuardOptions
 
     public NearLimitOptions NearLimit { get; set; } = new();
 
+    public UpdateOptions Updates { get; set; } = new();
+
     public LoggingOptions Logging { get; set; } = new();
 
     public bool NotificationsEnabled { get; set; } = true;
@@ -75,6 +77,12 @@ public sealed class LoggingOptions
     public Microsoft.Extensions.Logging.LogLevel Level { get; set; } = Microsoft.Extensions.Logging.LogLevel.Information;
 
     public int RetentionDays { get; set; } = 14;
+}
+
+/// <summary>Self-update (PRD MVP-3). The check reads the public GitHub release feed; it sends no user data.</summary>
+public sealed class UpdateOptions
+{
+    public bool CheckAutomatically { get; set; } = true;
 }
 
 /// <summary>Warnings before a window is exhausted (PRD §33).</summary>

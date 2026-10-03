@@ -27,7 +27,9 @@ public sealed class HostTests : IAsyncDisposable
     }
 
     /// <param name="mode">Manual keeps the monitor from resetting on its own, isolating "Reset now".</param>
-    private DesktopHost CreateHost(GuardMode mode = GuardMode.Confirm)
+    private DesktopHost CreateHost(GuardMode mode = GuardMode.Confirm) => CreateHost(mode, updates: null);
+
+    private DesktopHost CreateHost(GuardMode mode, IUpdateService? updates)
     {
         // Fast verification so reset flows finish quickly.
         var options = new GuardOptions { Mode = mode };
@@ -35,7 +37,7 @@ public sealed class HostTests : IAsyncDisposable
         options.Reset.CooldownSeconds = 0;
         new TomlConfigStore(Path.Combine(_root, "config.toml")).Save(options);
 
-        _host = new DesktopHost(new AppPaths(_root), _codex, _autostart, _ => _notifier, NullLoggerFactory.Instance, new FixedTime(Fixtures.Now));
+        _host = new DesktopHost(new AppPaths(_root), _codex, _autostart, _ => _notifier, NullLoggerFactory.Instance, new FixedTime(Fixtures.Now), updates);
         return _host;
     }
 
@@ -127,6 +129,73 @@ public sealed class HostTests : IAsyncDisposable
         Assert.Equal(["crash-key"], _codex.ConsumeKeys);
         Assert.False(host.ViewModel.HasPendingAttempt);
         Assert.Null(new JsonResetStateStore(Path.Combine(_root, "state.json")).Load().Pending);
+    }
+
+    [Fact]
+    public async Task Newer_release_shows_a_banner_and_notifies_once()
+    {
+        var updates = new FakeUpdates("0.4.0");
+        var host = CreateHost(GuardMode.Manual, updates);
+        host.Start(new FakeUi(answer: false));
+
+        await host.CheckForUpdateAsync(CancellationToken.None);
+        await host.CheckForUpdateAsync(CancellationToken.None);
+
+        Assert.True(host.ViewModel.UpdateAvailable);
+        Assert.Equal("0.4.0", host.ViewModel.UpdateVersion);
+        Assert.True(host.ViewModel.InstallUpdateCommand.CanExecute(null));
+        lock (_notifier.Shown)
+        {
+            Assert.Single(_notifier.Shown, n => n.Title == "ResetMe 0.4.0 is available");
+        }
+    }
+
+    [Fact]
+    public async Task Up_to_date_or_offline_stays_quiet()
+    {
+        var updates = new FakeUpdates("0.3.0");
+        var host = CreateHost(GuardMode.Manual, updates);
+        host.Start(new FakeUi(answer: false));
+
+        await host.CheckForUpdateAsync(CancellationToken.None);
+        updates.FailCheckWith = new HttpRequestException("offline");
+        await host.CheckForUpdateAsync(CancellationToken.None);
+
+        Assert.False(host.ViewModel.UpdateAvailable);
+        Assert.Equal(2, updates.Checks);
+    }
+
+    [Fact]
+    public async Task Development_builds_show_the_release_but_cannot_install()
+    {
+        var host = CreateHost(GuardMode.Manual, new FakeUpdates("0.4.0", canInstall: false));
+        host.Start(new FakeUi(answer: false));
+
+        await host.CheckForUpdateAsync(CancellationToken.None);
+
+        Assert.True(host.ViewModel.UpdateAvailable);
+        Assert.False(host.ViewModel.InstallUpdateCommand.CanExecute(null));
+        Assert.Contains("https://github.test/release", host.ViewModel.UpdateText, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(true, 1, 1)]
+    [InlineData(false, 0, 0)]
+    public async Task Installing_needs_confirmation_then_exits_for_the_restart(bool accept, int installs, int exits)
+    {
+        var updates = new FakeUpdates("0.4.0");
+        var host = CreateHost(GuardMode.Manual, updates);
+        var exitRequests = 0;
+        host.RequestExit = () => exitRequests++;
+        var ui = new FakeUi(answer: false, answerQuestions: accept);
+        host.Start(ui);
+        await host.CheckForUpdateAsync(CancellationToken.None);
+
+        await host.InstallUpdateAsync();
+
+        Assert.Equal(["Install ResetMe 0.4.0?"], ui.AskedTitles);
+        Assert.Equal(installs, updates.Installs);
+        Assert.Equal(exits, exitRequests);
     }
 
     [Fact]

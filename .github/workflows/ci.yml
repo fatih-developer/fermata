@@ -85,6 +85,9 @@ jobs:
           test "$(wc -l < consume.log | tr -d ' ')" -eq 1
           "$cli" logs -n 20
 
+      - name: Self-update end to end (fake release feed)
+        run: scripts/update-e2e.sh ${{ matrix.rid }} 0.2.0-ci.${{ github.run_number }}
+
       - uses: actions/upload-artifact@v4
         with:
           name: resetme-${{ matrix.rid }}

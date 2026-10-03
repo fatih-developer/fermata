@@ -67,6 +67,12 @@ var diagnostics = new Command("diagnostics", "Export a sanitized diagnostics zip
 diagnostics.SetAction((parse, ct) => Guarded("diagnostics", () => DiagnosticsCommand.RunAsync(parse.GetValue(diagnosticsOut), parse.GetValue(noDoctor), ct)));
 root.Subcommands.Add(diagnostics);
 
+var updateCheck = new Option<bool>("--check") { Description = "Only report whether a newer release exists." };
+var updateYes = new Option<bool>("--yes", "-y") { Description = "Do not ask for confirmation." };
+var update = new Command("update", "Update ResetMe from GitHub Releases (verified with SHA256SUMS).") { updateCheck, updateYes };
+update.SetAction((parse, ct) => Guarded("update", () => UpdateCommand.RunAsync(parse.GetValue(updateCheck), parse.GetValue(updateYes), ct)));
+root.Subcommands.Add(update);
+
 try
 {
     return await root.Parse(args).InvokeAsync().ConfigureAwait(false);
@@ -111,6 +117,14 @@ static async Task<int> Guarded(string command, Func<Task<int>> action)
     catch (CodexProtocolException ex)
     {
         return Fail(ex, "PROTOCOL_ERROR", $"Unexpected Codex response: {ex.Message}", ExitCodes.Error);
+    }
+    catch (ResetMe.Platform.Updates.UpdateException ex)
+    {
+        return Fail(ex, "UPDATE_FAILED", $"UPDATE_FAILED: {ex.Message}", ExitCodes.Error);
+    }
+    catch (HttpRequestException ex)
+    {
+        return Fail(ex, "UPDATE_UNREACHABLE", $"Could not reach the update server: {ex.Message}", ExitCodes.Error);
     }
     catch (InvalidDataException ex)
     {

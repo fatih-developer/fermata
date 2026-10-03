@@ -39,6 +39,10 @@ public sealed partial class DesktopHost : IAsyncDisposable
     private readonly Func<GuardOptions, INotifier> _notifierFactory;
     private readonly TimeProvider _time;
     private readonly SemaphoreSlim _dialogGate = new(1, 1);
+    private readonly IUpdateService? _updates;
+    private readonly CancellationTokenSource _updateLoopStop = new();
+    private string? _notifiedUpdateVersion;
+    private Platform.Updates.UpdateCheckResult? _availableUpdate;
 
     private IDesktopUi? _ui;
     private CancellationTokenSource? _monitorStop;
@@ -51,9 +55,11 @@ public sealed partial class DesktopHost : IAsyncDisposable
         IAutostartManager autostart,
         Func<GuardOptions, INotifier> notifierFactory,
         ILoggerFactory loggers,
-        TimeProvider time)
+        TimeProvider time,
+        IUpdateService? updates = null)
     {
         _paths = paths;
+        _updates = updates;
         _configStore = new TomlConfigStore(paths.ConfigFile);
         _stateStore = new JsonResetStateStore(paths.StateFile);
         _resetLock = new FileResetLock(paths.LockFile);
@@ -71,6 +77,7 @@ public sealed partial class DesktopHost : IAsyncDisposable
         ViewModel = new MainViewModel(ResetNowAsync, SaveSettingsAsync, OpenLogs);
         ViewModel.SetFinishPendingAction(FinishPendingAsync);
         ViewModel.SetExportDiagnosticsAction(() => ExportDiagnostics(openFolder: true));
+        ViewModel.SetInstallUpdateAction(InstallUpdateAsync);
         ViewModel.LoadSettings(Options, _autostart.GetStatus(AutostartTarget.Desktop).Enabled);
         foreach (var warning in config.Warnings)
         {
@@ -86,6 +93,102 @@ public sealed partial class DesktopHost : IAsyncDisposable
     {
         _ui = ui;
         StartMonitor();
+        if (_updates is not null && Options.Updates.CheckAutomatically)
+        {
+            _ = Task.Run(() => UpdateLoopAsync(_updateLoopStop.Token));
+        }
+    }
+
+    /// <summary>Asks the app to exit (after an update was handed to the installer).</summary>
+    public Action RequestExit { get; set; } = () => { };
+
+    public static readonly TimeSpan FirstUpdateCheckDelay = TimeSpan.FromSeconds(20);
+    public static readonly TimeSpan UpdateCheckInterval = TimeSpan.FromHours(24);
+
+    /// <summary>Checks once; shows and notifies (once per version) when a newer release exists.</summary>
+    public async Task CheckForUpdateAsync(CancellationToken cancellationToken)
+    {
+        if (_updates is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var check = await _updates.CheckAsync(cancellationToken).ConfigureAwait(false);
+            LogUpdateChecked(_logger, check.CurrentVersion, check.Latest.Version);
+            if (!check.UpdateAvailable)
+            {
+                return;
+            }
+
+            _availableUpdate = check;
+            var canInstall = _updates.CanInstall && check.Package is not null && check.Checksums is not null;
+            _ui?.Post(() => ViewModel.ShowUpdate(check.Latest.Version, check.Latest.PageUrl.ToString(), canInstall));
+
+            if (_notifiedUpdateVersion != check.Latest.Version && _notifier.IsAvailable)
+            {
+                _notifiedUpdateVersion = check.Latest.Version;
+                _ = _notifier.ShowAsync(
+                    new Notification(NotificationKind.Info, $"ResetMe {check.Latest.Version} is available", "Open ResetMe to install the update."),
+                    CancellationToken.None);
+            }
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or InvalidDataException or IOException)
+        {
+            // Offline or rate limited: try again next time, quietly.
+            LogUpdateCheckFailed(_logger, ex);
+        }
+    }
+
+    public async Task InstallUpdateAsync()
+    {
+        if (_updates is null || _availableUpdate is not { } check || _ui is null)
+        {
+            return;
+        }
+
+        var accepted = await _ui.AskAsync(
+            $"Install ResetMe {check.Latest.Version}?",
+            $"ResetMe downloads the release from GitHub, verifies it against SHA256SUMS.txt and restarts.\n\nInstalled: {check.CurrentVersion}\nNew: {check.Latest.Version}",
+            "Install and restart",
+            "Not now").ConfigureAwait(true);
+        if (!accepted)
+        {
+            return;
+        }
+
+        var now = _time.GetUtcNow();
+        try
+        {
+            var progress = new Progress<string>(text => ViewModel.UpdateText = text);
+            await _updates.InstallAsync(check, progress, CancellationToken.None).ConfigureAwait(true);
+            LogUpdateInstalled(_logger, check.Latest.Version);
+            ViewModel.AddEvent($"Installing ResetMe {check.Latest.Version}; restarting.", now);
+            RequestExit();
+        }
+        catch (Exception ex) when (ex is Platform.Updates.UpdateException or HttpRequestException or IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            LogUpdateFailed(_logger, ex);
+            ViewModel.UpdateText = $"Update failed: {ex.Message}";
+            ViewModel.AddEvent($"Update failed: {ex.Message}", now);
+        }
+    }
+
+    private async Task UpdateLoopAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(FirstUpdateCheckDelay, _time, cancellationToken).ConfigureAwait(false);
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                await CheckForUpdateAsync(cancellationToken).ConfigureAwait(false);
+                await Task.Delay(UpdateCheckInterval, _time, cancellationToken).ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
     }
 
     public Task ChangeModeAsync(GuardMode mode)
@@ -212,6 +315,8 @@ public sealed partial class DesktopHost : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        await _updateLoopStop.CancelAsync().ConfigureAwait(false);
+        _updateLoopStop.Dispose();
         await StopMonitorAsync().ConfigureAwait(false);
         _dialogGate.Dispose();
     }
@@ -380,6 +485,18 @@ public sealed partial class DesktopHost : IAsyncDisposable
 
     [LoggerMessage(402, LogLevel.Error, "Manual reset failed")]
     private static partial void LogResetNowFailed(ILogger logger, Exception error);
+
+    [LoggerMessage(403, LogLevel.Information, "Update check: installed {Current}, latest {Latest}")]
+    private static partial void LogUpdateChecked(ILogger logger, string current, string latest);
+
+    [LoggerMessage(404, LogLevel.Debug, "Update check failed")]
+    private static partial void LogUpdateCheckFailed(ILogger logger, Exception error);
+
+    [LoggerMessage(405, LogLevel.Information, "Update {Version} handed to the installer; exiting")]
+    private static partial void LogUpdateInstalled(ILogger logger, string version);
+
+    [LoggerMessage(406, LogLevel.Warning, "Update failed")]
+    private static partial void LogUpdateFailed(ILogger logger, Exception error);
 }
 
 /// <summary>Monitor events → view model (on the UI thread) and the confirmation dialog.</summary>

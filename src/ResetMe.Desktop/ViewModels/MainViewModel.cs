@@ -30,6 +30,7 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly Func<Task> _resetNow;
     private Func<Task> _finishPending = () => Task.CompletedTask;
     private Action _exportDiagnostics = () => { };
+    private Func<Task> _installUpdate = () => Task.CompletedTask;
     private readonly Func<Task> _saveSettings;
     private readonly Action _openLogs;
 
@@ -103,6 +104,7 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ResetNowCommand))]
     [NotifyCanExecuteChangedFor(nameof(FinishPendingCommand))]
+    [NotifyCanExecuteChangedFor(nameof(InstallUpdateCommand))]
     public partial bool IsBusy { get; set; }
 
     /// <summary>An earlier attempt has no confirmed result; offer to finish it with the same key.</summary>
@@ -112,6 +114,20 @@ public sealed partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     public partial string PendingText { get; set; } = "";
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(InstallUpdateCommand))]
+    public partial bool UpdateAvailable { get; set; }
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(InstallUpdateCommand))]
+    public partial bool CanInstallUpdate { get; set; }
+
+    [ObservableProperty]
+    public partial string UpdateVersion { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string UpdateText { get; set; } = "";
 
     // Settings (PRD §20)
     [ObservableProperty]
@@ -262,6 +278,34 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     private bool CanExecuteResetNow() => CanResetNow && !IsBusy;
+
+    public void ShowUpdate(string version, string pageUrl, bool canInstall)
+    {
+        UpdateVersion = version;
+        CanInstallUpdate = canInstall;
+        UpdateText = canInstall
+            ? $"ResetMe {version} is available. Installing restarts ResetMe."
+            : $"ResetMe {version} is available: {pageUrl}";
+        UpdateAvailable = true;
+    }
+
+    public void SetInstallUpdateAction(Func<Task> action) => _installUpdate = action;
+
+    [RelayCommand(CanExecute = nameof(CanExecuteInstallUpdate))]
+    private async Task InstallUpdateAsync()
+    {
+        IsBusy = true;
+        try
+        {
+            await _installUpdate().ConfigureAwait(true);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private bool CanExecuteInstallUpdate() => UpdateAvailable && CanInstallUpdate && !IsBusy;
 
     /// <summary>Wires the "Export diagnostics" action (set by the host).</summary>
     public void SetExportDiagnosticsAction(Action action) => _exportDiagnostics = action;

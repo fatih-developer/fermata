@@ -7,7 +7,7 @@ Codex'in 5 saatlik veya haftalık kullanım limiti dolduğunda bunu tespit eden 
 
 ## Durum
 
-MVP-1 ve MVP-2 tamam: CLI (`status`, `watch`, `reset`, `daemon`, `autostart`, `doctor`, `config`, `logs`), tray / menu bar uygulaması, yerel bildirimler ve açılışta başlatma. Sıradaki: MVP-3 (near-limit uyarıları, self-update, imzalı NativeAOT release'ler).
+MVP-1, MVP-2 ve MVP-3 tamam: CLI (`status`, `watch`, `reset`, `daemon`, `autostart`, `update`, `diagnostics`, `doctor`, `config`, `logs`), tray / menu bar uygulaması, yerel bildirimler, açılışta başlatma, limite yaklaşma uyarıları, otomatik güncelleme ve tanılama dışa aktarma. Açık iş: imzalı (Authenticode / notarized) release'ler.
 
 ## Gereksinimler
 
@@ -40,7 +40,17 @@ dotnet run --project src/ResetMe.Cli -- logs -n 100    # son log kayıtları (--
 dotnet run --project src/ResetMe.Cli -- daemon         # başsız izleme (SSH, sunucu, systemd/launchd)
 dotnet run --project src/ResetMe.Cli -- autostart enable --target desktop
 dotnet run --project src/ResetMe.Cli -- doctor --notify # test bildirimi de gönderir
+dotnet run --project src/ResetMe.Cli -- update --check  # yeni sürüm var mı?
+dotnet run --project src/ResetMe.Cli -- diagnostics     # temizlenmiş tanılama zip'i
 ```
+
+### Güncellemeler ve gizlilik
+
+ResetMe, Codex dışında yalnızca bir ağ isteği yapar: masaüstü uygulaması günde bir kez herkese açık GitHub release bilgisini okur (`[updates] check_automatically = false` ile kapatılır). Kullanıcı verisi gönderilmez. `resetme update` paketi `SHA256SUMS.txt` ile doğrulamadan kurmaz; geliştirme derlemelerini (`bin/Debug`) hiçbir zaman değiştirmez.
+
+### Limite yaklaşma uyarıları
+
+`[near_limit] thresholds = [80, 90, 95]`: her eşik, pencere dönemi başına bir kez bildirilir.
 
 `watch` her limit olayı için en fazla bir kez sorar. "Hayır" derseniz aynı limit için tekrar sormaz. Soru beklerken izleme duraklar. `mode = "automatic"` ayarıyla onay istemeden reset yapar; günlük ve haftalık sınırlar ile cooldown geçerlidir.
 
@@ -68,7 +78,9 @@ scripts/package.sh linux-x64    # artifacts/package/resetme-linux-x64.tar.gz
 scripts/package.sh osx-arm64    # artifacts/package/resetme-macos-arm64.tar.gz (ResetMe.app)
 ```
 
-CI her push'ta üç platformda paket üretir, paketlenmiş `resetme daemon`'ı sahte Codex'e karşı çalıştırır ve paketleri artifact olarak saklar.
+CI her push'ta üç platformda paket üretir, paketlenmiş `resetme daemon`'ı sahte Codex'e karşı çalıştırır, eski bir paketi sahte bir release sunucusundan güncelleyerek `resetme update`'i uçtan uca dener (`scripts/update-e2e.sh`) ve paketleri artifact olarak saklar.
+
+Release: `git tag v0.3.0 && git push origin v0.3.0` → `.github/workflows/release.yml` altı platform paketini ve `SHA256SUMS.txt`'yi bir GitHub Release olarak yayınlar.
 
 ## Windows notu
 
