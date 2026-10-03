@@ -20,6 +20,9 @@ public interface IDesktopUi
 
     /// <summary>Shows the reset confirmation (PRD §38). True means "use a credit".</summary>
     Task<bool> ConfirmAsync(ConfirmViewModel content);
+
+    /// <summary>A yes/no question. True means <paramref name="accept"/> was chosen.</summary>
+    Task<bool> AskAsync(string title, string message, string accept, string cancel);
 }
 
 /// <summary>Composition and behaviour of the tray app: monitor lifecycle, manual reset, settings.</summary>
@@ -91,6 +94,15 @@ public sealed partial class DesktopHost : IAsyncDisposable
 
     public async Task SaveSettingsAsync()
     {
+        if (ViewModel.ModeIndex == (int)GuardMode.Automatic
+            && Options.Mode != GuardMode.Automatic
+            && !await ConfirmAutomaticModeAsync().ConfigureAwait(true))
+        {
+            ViewModel.ModeIndex = (int)Options.Mode;
+            ViewModel.SettingsMessage = "Automatic mode was not enabled.";
+            return;
+        }
+
         try
         {
             Options = ViewModel.ApplySettings(Options);
@@ -106,6 +118,26 @@ public sealed partial class DesktopHost : IAsyncDisposable
             LogSettingsFailed(_logger, ex);
             ViewModel.SettingsMessage = $"Could not save: {ex.Message}";
         }
+    }
+
+    /// <summary>PRD §9.3: automatic mode must be enabled explicitly, knowing what it does.</summary>
+    internal Task<bool> ConfirmAutomaticModeAsync()
+    {
+        if (_ui is null)
+        {
+            return Task.FromResult(false);
+        }
+
+        var o = Options;
+        var message =
+            "In automatic mode ResetMe redeems a reset credit as soon as Codex reports a limit, without asking you.\n\n"
+            + "Safeguards that still apply:\n"
+            + $"• at most {o.Automatic.MaxResetsPerDay} per day and {o.Automatic.MaxResetsPerWeek} per week\n"
+            + $"• {o.Reset.CooldownSeconds}s cooldown between attempts\n"
+            + $"• skipped when the limit lifts on its own within {o.Reset.MinTimeToNaturalResetMinutes} minutes\n"
+            + "• never twice for the same limit, never for workspace limits, never unless Codex confirms the block\n\n"
+            + "You get a notification after every automatic reset.";
+        return _ui.AskAsync("Enable automatic mode?", message, "Enable automatic mode", "Cancel");
     }
 
     /// <summary>"Reset now" from the window or tray: fresh read, confirmation, then ResetManager.</summary>

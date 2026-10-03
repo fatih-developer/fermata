@@ -84,6 +84,14 @@ public partial class App : Application, IDesktopUi
         return await dialog.Result.ConfigureAwait(true);
     }
 
+    public async Task<bool> AskAsync(string title, string message, string accept, string cancel)
+    {
+        var dialog = new QuestionWindow(title, message, accept, cancel) { Icon = _window?.Icon };
+        dialog.Show();
+        dialog.Activate();
+        return await dialog.Result.ConfigureAwait(true);
+    }
+
     private static LoggingOptions LoadLoggingOptions(AppPaths paths)
     {
         try

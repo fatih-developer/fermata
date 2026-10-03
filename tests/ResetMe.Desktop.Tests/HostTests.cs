@@ -137,10 +137,39 @@ public sealed class HostTests : IAsyncDisposable
         var host = CreateHost();
         host.Start(new FakeUi(answer: false));
 
+        await host.ChangeModeAsync(GuardMode.Manual);
+
+        Assert.Equal(GuardMode.Manual, new TomlConfigStore(Path.Combine(_root, "config.toml")).Load().Options.Mode);
+        Assert.Equal(0, host.ViewModel.ModeIndex);
+    }
+
+    [Fact]
+    public async Task Automatic_mode_requires_explicit_confirmation()
+    {
+        var host = CreateHost();
+        var ui = new FakeUi(answer: false, answerQuestions: false);
+        host.Start(ui);
+
         await host.ChangeModeAsync(GuardMode.Automatic);
 
+        Assert.Equal(["Enable automatic mode?"], ui.AskedTitles);
+        Assert.Equal(GuardMode.Confirm, new TomlConfigStore(Path.Combine(_root, "config.toml")).Load().Options.Mode);
+        Assert.Equal((int)GuardMode.Confirm, host.ViewModel.ModeIndex);
+        Assert.Equal("Automatic mode was not enabled.", host.ViewModel.SettingsMessage);
+    }
+
+    [Fact]
+    public async Task Automatic_mode_is_enabled_after_confirmation_and_not_asked_again()
+    {
+        var host = CreateHost();
+        var ui = new FakeUi(answer: false, answerQuestions: true);
+        host.Start(ui);
+
+        await host.ChangeModeAsync(GuardMode.Automatic);
+        await host.SaveSettingsAsync(); // already automatic: no second question
+
+        Assert.Single(ui.AskedTitles);
         Assert.Equal(GuardMode.Automatic, new TomlConfigStore(Path.Combine(_root, "config.toml")).Load().Options.Mode);
-        Assert.Equal(2, host.ViewModel.ModeIndex);
     }
 
     private static async Task WaitUntil(Func<bool> condition)

@@ -106,6 +106,22 @@ public class RenderingTests
         Assert.False(dialog.Result.Result);
     }
 
+    [AvaloniaFact]
+    public void Automatic_mode_question_renders()
+    {
+        var dialog = new QuestionWindow(
+            "Enable automatic mode?",
+            "In automatic mode ResetMe redeems a reset credit as soon as Codex reports a limit, without asking you.\n\nSafeguards that still apply:\n• at most 1 per day and 2 per week\n• 120s cooldown between attempts",
+            "Enable automatic mode",
+            "Cancel");
+        dialog.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        Save(dialog.CaptureRenderedFrame(), "automatic-mode-question.png");
+        dialog.Close();
+        Assert.False(dialog.Result.Result);
+    }
+
     [AvaloniaTheory]
     [InlineData(HealthKind.Ok, 40)]
     [InlineData(HealthKind.Warning, 85)]

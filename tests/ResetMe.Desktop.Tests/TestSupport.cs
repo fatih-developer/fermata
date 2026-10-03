@@ -99,8 +99,16 @@ internal sealed class FakeCodex : ICodexConnector, ICodexConnection
     }
 }
 
-internal sealed class FakeUi(bool answer) : IDesktopUi
+internal sealed class FakeUi(bool answer, bool answerQuestions = false) : IDesktopUi
 {
+    public List<string> AskedTitles { get; } = [];
+
+    public Task<bool> AskAsync(string title, string message, string accept, string cancel)
+    {
+        AskedTitles.Add(title);
+        return Task.FromResult(answerQuestions);
+    }
+
     public int Questions { get; private set; }
 
     public ConfirmViewModel? LastQuestion { get; private set; }
