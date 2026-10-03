@@ -130,6 +130,21 @@ public sealed class HostTests : IAsyncDisposable
     }
 
     [Fact]
+    public void Diagnostics_export_includes_the_desktop_summary()
+    {
+        var host = CreateHost();
+        host.ViewModel.AddEvent("Connected to Codex.", Fixtures.Now);
+
+        var file = host.ExportDiagnostics(openFolder: false);
+
+        Assert.NotNull(file);
+        using var zip = System.IO.Compression.ZipFile.OpenRead(file);
+        Assert.Contains(zip.Entries, e => e.FullName == "desktop.txt");
+        Assert.Contains(zip.Entries, e => e.FullName == "config.toml");
+        Assert.Contains(host.ViewModel.Events, e => e.Contains("Diagnostics exported", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Saving_settings_writes_config_and_registers_autostart()
     {
         var host = CreateHost();

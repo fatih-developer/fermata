@@ -70,6 +70,7 @@ public sealed partial class DesktopHost : IAsyncDisposable
 
         ViewModel = new MainViewModel(ResetNowAsync, SaveSettingsAsync, OpenLogs);
         ViewModel.SetFinishPendingAction(FinishPendingAsync);
+        ViewModel.SetExportDiagnosticsAction(() => ExportDiagnostics(openFolder: true));
         ViewModel.LoadSettings(Options, _autostart.GetStatus(AutostartTarget.Desktop).Enabled);
         foreach (var warning in config.Warnings)
         {
@@ -317,16 +318,57 @@ public sealed partial class DesktopHost : IAsyncDisposable
         }
     }
 
-    private void OpenLogs()
+    private void OpenLogs() => OpenFolder(_paths.LogDirectory);
+
+    /// <summary>Writes a sanitized diagnostics zip into the data directory and returns its path.</summary>
+    public string? ExportDiagnostics(bool openFolder)
+    {
+        var now = _time.GetUtcNow();
+        try
+        {
+            var folder = Path.Combine(_paths.Root, "diagnostics");
+            var summary = new System.Text.StringBuilder()
+                .AppendLine($"Status: {ViewModel.StatusText} {ViewModel.StatusDetail}")
+                .AppendLine($"5-hour: {ViewModel.FiveHourDetailText} {ViewModel.FiveHourResetText}")
+                .AppendLine($"Weekly: {ViewModel.WeeklyDetailText} {ViewModel.WeeklyResetText}")
+                .AppendLine($"Credits: {ViewModel.CreditsText} {ViewModel.CreditExpiryText}")
+                .AppendLine($"Mode: {Options.Mode}")
+                .AppendLine($"Pending attempt: {ViewModel.HasPendingAttempt}")
+                .AppendLine()
+                .AppendLine("Recent events:")
+                .AppendJoin(Environment.NewLine, ViewModel.Events)
+                .ToString();
+
+            var file = Platform.Diagnostics.DiagnosticsBundle.Create(
+                _paths,
+                Path.Combine(folder, Platform.Diagnostics.DiagnosticsBundle.DefaultFileName(now)),
+                new Dictionary<string, string> { ["desktop.txt"] = summary },
+                _time);
+            ViewModel.AddEvent($"Diagnostics exported: {file}", now);
+            if (openFolder)
+            {
+                OpenFolder(folder);
+            }
+
+            return file;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            ViewModel.AddEvent($"Diagnostics export failed: {ex.Message}", now);
+            return null;
+        }
+    }
+
+    private void OpenFolder(string folder)
     {
         try
         {
-            Directory.CreateDirectory(_paths.LogDirectory);
-            Process.Start(new ProcessStartInfo(_paths.LogDirectory) { UseShellExecute = true })?.Dispose();
+            Directory.CreateDirectory(folder);
+            Process.Start(new ProcessStartInfo(folder) { UseShellExecute = true })?.Dispose();
         }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or IOException)
         {
-            ViewModel.AddEvent($"Could not open {_paths.LogDirectory}: {ex.Message}", _time.GetUtcNow());
+            ViewModel.AddEvent($"Could not open {folder}: {ex.Message}", _time.GetUtcNow());
         }
     }
 

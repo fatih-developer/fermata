@@ -29,6 +29,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     private readonly Func<Task> _resetNow;
     private Func<Task> _finishPending = () => Task.CompletedTask;
+    private Action _exportDiagnostics = () => { };
     private readonly Func<Task> _saveSettings;
     private readonly Action _openLogs;
 
@@ -261,6 +262,12 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     private bool CanExecuteResetNow() => CanResetNow && !IsBusy;
+
+    /// <summary>Wires the "Export diagnostics" action (set by the host).</summary>
+    public void SetExportDiagnosticsAction(Action action) => _exportDiagnostics = action;
+
+    [RelayCommand]
+    private void ExportDiagnostics() => _exportDiagnostics();
 
     /// <summary>Wires the "Finish pending reset" action (set by the host).</summary>
     public void SetFinishPendingAction(Func<Task> action) => _finishPending = action;

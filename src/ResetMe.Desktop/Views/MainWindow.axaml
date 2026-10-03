@@ -114,9 +114,10 @@
           <CheckBox Content="{Binding NearLimitLabel}" IsChecked="{Binding NearLimitEnabled}" />
           <CheckBox Content="Start ResetMe at login" IsChecked="{Binding StartAtLogin}" />
           <CheckBox Content="Start hidden in the tray / menu bar" IsChecked="{Binding StartMinimized}" />
-          <Grid ColumnDefinitions="*,Auto">
-            <TextBlock Classes="hint" Text="{Binding SettingsMessage}" VerticalAlignment="Center" />
-            <Button Grid.Column="1" Content="Save" Command="{Binding SaveSettingsCommand}" />
+          <Grid ColumnDefinitions="*,Auto,Auto">
+            <TextBlock Classes="hint" Text="{Binding SettingsMessage}" VerticalAlignment="Center" TextWrapping="Wrap" />
+            <Button Grid.Column="1" Content="Export diagnostics" Command="{Binding ExportDiagnosticsCommand}" Margin="0,0,8,0" />
+            <Button Grid.Column="2" Content="Save" Command="{Binding SaveSettingsCommand}" />
           </Grid>
         </StackPanel>
       </Expander>

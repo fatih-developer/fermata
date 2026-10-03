@@ -61,6 +61,12 @@ var logs = new Command("logs", "Show recent log entries.") { tail, logsJson, log
 logs.SetAction(parse => LogsCommand.Run(parse.GetValue(tail), parse.GetValue(logsJson), parse.GetValue(logsPath)));
 root.Subcommands.Add(logs);
 
+var diagnosticsOut = new Option<string?>("--out", "-o") { Description = "Zip file to write (default: ./resetme-diagnostics-<time>.zip)." };
+var noDoctor = new Option<bool>("--no-doctor") { Description = "Skip running doctor (no Codex connection)." };
+var diagnostics = new Command("diagnostics", "Export a sanitized diagnostics zip (config, state, logs, doctor).") { diagnosticsOut, noDoctor };
+diagnostics.SetAction((parse, ct) => Guarded("diagnostics", () => DiagnosticsCommand.RunAsync(parse.GetValue(diagnosticsOut), parse.GetValue(noDoctor), ct)));
+root.Subcommands.Add(diagnostics);
+
 try
 {
     return await root.Parse(args).InvokeAsync().ConfigureAwait(false);
