@@ -37,6 +37,15 @@ public sealed class NotifyingObserver : IMonitorObserver
         _inner.OnLimitReached(notice);
     }
 
+    public void OnPendingAttempt(PendingResetAttempt pending)
+    {
+        Notify(new Notification(
+            NotificationKind.ResetProblem,
+            "Reset needs attention",
+            "An earlier reset attempt has no confirmed result. Finish it from ResetMe or with `resetme reset`; it cannot use a second credit."));
+        _inner.OnPendingAttempt(pending);
+    }
+
     public void OnNearLimit(NearLimitNotice notice, CodexUsage usage)
     {
         ArgumentNullException.ThrowIfNull(usage);

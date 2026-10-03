@@ -101,6 +101,36 @@ public sealed class PlatformTests : IDisposable
     }
 
     [Fact]
+    public void Corrupt_state_falls_back_to_the_last_good_backup()
+    {
+        var path = Path.Combine(_dir, "state.json");
+        var store = new JsonResetStateStore(path);
+        store.Save(new ResetState { LastResolvedLimitEventId = "first" });
+        store.Save(new ResetState { Pending = new PendingResetAttempt("key-1", null, "episode-1", Usage.Now) });
+        File.WriteAllText(path, "{ truncated");
+
+        var loaded = store.Load();
+
+        Assert.Equal("first", loaded.LastResolvedLimitEventId); // the backup holds the previous good version
+        Assert.NotNull(store.LastLoadWarning);
+    }
+
+    [Fact]
+    public void A_corrupt_file_never_replaces_a_good_backup()
+    {
+        var path = Path.Combine(_dir, "state.json");
+        var store = new JsonResetStateStore(path);
+        store.Save(new ResetState { LastResolvedLimitEventId = "good" });
+        store.Save(new ResetState { LastResolvedLimitEventId = "newer" });
+        File.WriteAllText(path, "garbage");
+
+        store.Save(new ResetState { LastResolvedLimitEventId = "after-recovery" });
+
+        Assert.Equal("good", new JsonResetStateStore(store.BackupPath).Load().LastResolvedLimitEventId);
+        Assert.Equal("after-recovery", store.Load().LastResolvedLimitEventId);
+    }
+
+    [Fact]
     public void Corrupt_state_is_reported_not_overwritten()
     {
         var path = Path.Combine(_dir, "state.json");

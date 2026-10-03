@@ -109,6 +109,27 @@ public sealed class HostTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task Pending_attempt_is_shown_and_finished_with_its_own_key()
+    {
+        _codex.Usage = Fixtures.Blocked();
+        var host = CreateHost(GuardMode.Manual);
+        new JsonResetStateStore(Path.Combine(_root, "state.json")).Save(new Core.Reset.ResetState
+        {
+            Pending = new Core.Reset.PendingResetAttempt("crash-key", "credit-1", "episode", Fixtures.Now),
+        });
+
+        host.Start(new FakeUi(answer: false));
+        await WaitUntil(() => host.ViewModel.HasPendingAttempt);
+        Assert.True(host.ViewModel.FinishPendingCommand.CanExecute(null));
+
+        await host.FinishPendingAsync();
+
+        Assert.Equal(["crash-key"], _codex.ConsumeKeys);
+        Assert.False(host.ViewModel.HasPendingAttempt);
+        Assert.Null(new JsonResetStateStore(Path.Combine(_root, "state.json")).Load().Pending);
+    }
+
+    [Fact]
     public async Task Saving_settings_writes_config_and_registers_autostart()
     {
         var host = CreateHost();

@@ -28,6 +28,7 @@ public sealed partial class MainViewModel : ObservableObject
     public const double WarningPercent = 80;
 
     private readonly Func<Task> _resetNow;
+    private Func<Task> _finishPending = () => Task.CompletedTask;
     private readonly Func<Task> _saveSettings;
     private readonly Action _openLogs;
 
@@ -100,7 +101,16 @@ public sealed partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ResetNowCommand))]
+    [NotifyCanExecuteChangedFor(nameof(FinishPendingCommand))]
     public partial bool IsBusy { get; set; }
+
+    /// <summary>An earlier attempt has no confirmed result; offer to finish it with the same key.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(FinishPendingCommand))]
+    public partial bool HasPendingAttempt { get; set; }
+
+    [ObservableProperty]
+    public partial string PendingText { get; set; } = "";
 
     // Settings (PRD §20)
     [ObservableProperty]
@@ -251,6 +261,37 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     private bool CanExecuteResetNow() => CanResetNow && !IsBusy;
+
+    /// <summary>Wires the "Finish pending reset" action (set by the host).</summary>
+    public void SetFinishPendingAction(Func<Task> action) => _finishPending = action;
+
+    public void ShowPendingAttempt(DateTimeOffset startedAt)
+    {
+        HasPendingAttempt = true;
+        PendingText = $"A reset attempt from {startedAt.ToLocalTime():g} has no confirmed result. Finishing it reuses the same key, so it cannot use a second credit.";
+    }
+
+    public void ClearPendingAttempt()
+    {
+        HasPendingAttempt = false;
+        PendingText = "";
+    }
+
+    [RelayCommand(CanExecute = nameof(CanFinishPending))]
+    private async Task FinishPendingAsync()
+    {
+        IsBusy = true;
+        try
+        {
+            await _finishPending().ConfigureAwait(true);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private bool CanFinishPending() => HasPendingAttempt && !IsBusy;
 
     [RelayCommand]
     private Task SaveSettingsAsync() => _saveSettings();

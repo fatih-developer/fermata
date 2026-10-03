@@ -114,6 +114,26 @@ public sealed class RateLimitMonitorTests : IDisposable
     }
 
     [Fact]
+    public async Task Unresolved_attempt_is_reported_once_at_start()
+    {
+        _store.Save(new ResetState { Pending = new PendingResetAttempt("key-9", null, "episode-9", Usage.Now) });
+        _client.FallbackUsage = Usage.Healthy();
+
+        await RunUntil(o => o.UsageReads >= 3);
+
+        Assert.Equal("key-9", Assert.Single(_observer.Pendings).IdempotencyKey);
+    }
+
+    [Fact]
+    public void Reconnect_backoff_grows_to_five_minutes()
+    {
+        var timing = MonitorTiming.FromOptions(new GuardOptions());
+
+        Assert.Equal(TimeSpan.FromSeconds(1), timing.ReconnectBackoff[0]);
+        Assert.Equal(TimeSpan.FromMinutes(5), timing.ReconnectBackoff[^1]);
+    }
+
+    [Fact]
     public async Task Near_limit_is_reported_once_per_threshold()
     {
         _client.ThenUsage(Usage.Healthy() with { FiveHour = new UsageWindow(85, 300, Usage.Now.AddHours(2)) });
@@ -303,6 +323,10 @@ public sealed class RateLimitMonitorTests : IDisposable
         public List<LimitNotice> Notices { get; } = [];
 
         public List<NearLimitNotice> NearLimits { get; } = [];
+
+        public List<PendingResetAttempt> Pendings { get; } = [];
+
+        public void OnPendingAttempt(PendingResetAttempt pending) => Pendings.Add(pending);
 
         public void OnNearLimit(NearLimitNotice notice, CodexUsage usage) => NearLimits.Add(notice);
 

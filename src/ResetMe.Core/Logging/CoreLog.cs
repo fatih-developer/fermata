@@ -69,6 +69,12 @@ internal static partial class MonitorLog
     [LoggerMessage(209, LogLevel.Information, "Codex usable again")]
     public static partial void Recovered(ILogger logger);
 
+    [LoggerMessage(211, LogLevel.Debug, "Codex still unavailable ({Failures} attempts); next try in {RetrySeconds}s")]
+    public static partial void StillUnavailable(ILogger logger, int failures, double retrySeconds);
+
+    [LoggerMessage(212, LogLevel.Warning, "Unresolved reset attempt {IdempotencyKey} from {StartedAt:o}; finish it with `resetme reset`")]
+    public static partial void PendingAttempt(ILogger logger, string idempotencyKey, DateTimeOffset startedAt);
+
     [LoggerMessage(210, LogLevel.Information, "Near limit: {Window} window at {UsedPercent}% (threshold {Threshold}%)")]
     public static partial void NearLimit(ILogger logger, string window, int threshold, double usedPercent);
 }

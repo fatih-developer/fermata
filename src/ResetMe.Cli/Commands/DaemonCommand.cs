@@ -71,6 +71,9 @@ internal sealed class DaemonObserver : IMonitorObserver
         Console.WriteLine($"{Stamp} LIMIT {text.Title}: {text.Body}");
     }
 
+    public void OnPendingAttempt(PendingResetAttempt pending) =>
+        Console.WriteLine($"{Stamp} PENDING attempt {pending.IdempotencyKey} from {pending.StartedAt:o}: run `resetme reset` to finish it");
+
     public void OnNearLimit(NearLimitNotice notice, CodexUsage usage)
     {
         var text = NotificationTexts.ForNearLimit(notice, usage.AvailableResetCount, DateTimeOffset.UtcNow);

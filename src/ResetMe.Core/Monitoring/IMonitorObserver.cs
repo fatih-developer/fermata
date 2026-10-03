@@ -41,6 +41,11 @@ public interface IMonitorObserver
 
     void OnLimitReached(LimitNotice notice);
 
+    /// <summary>At start-up: an earlier reset attempt has no confirmed result (crash, timeout).</summary>
+    void OnPendingAttempt(PendingResetAttempt pending)
+    {
+    }
+
     /// <summary>A window crossed a near-limit threshold (once per threshold per window period).</summary>
     void OnNearLimit(NearLimitNotice notice, CodexUsage usage)
     {

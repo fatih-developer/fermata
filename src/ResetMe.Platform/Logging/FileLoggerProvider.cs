@@ -111,7 +111,9 @@ public sealed class FileLoggerProvider : ILoggerProvider
             try
             {
                 var created = !File.Exists(path);
-                using (var stream = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.Read))
+                // Exclusive while appending: with shared access, two processes could both write at the
+                // same end offset and overwrite each other's lines (seen on Linux, where sharing maps to flock).
+                using (var stream = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.None))
                 {
                     if (stream.Length > MaxFileBytes)
                     {
@@ -129,7 +131,7 @@ public sealed class FileLoggerProvider : ILoggerProvider
 
                 return;
             }
-            catch (IOException) when (attempt < 20)
+            catch (IOException) when (attempt < 100)
             {
                 // Another ResetMe process is appending right now.
                 Thread.Sleep(15);

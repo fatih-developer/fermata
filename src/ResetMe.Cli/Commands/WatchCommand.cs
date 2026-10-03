@@ -144,6 +144,9 @@ internal sealed class ConsoleWatchObserver : IMonitorObserver
     /// <summary>Without an interactive stdin confirm mode only reports (and suggests `resetme reset`).</summary>
     public bool CanConfirm => !Console.IsInputRedirected;
 
+    public void OnPendingAttempt(PendingResetAttempt pending) =>
+        Console.WriteLine($"{Clock}  PENDING: a reset attempt from {pending.StartedAt.ToLocalTime():g} has no confirmed result. Run `resetme reset` to finish it (same key, no second credit).");
+
     public void OnNearLimit(NearLimitNotice notice, CodexUsage usage)
     {
         var text = NotificationTexts.ForNearLimit(notice, usage.AvailableResetCount, DateTimeOffset.UtcNow);

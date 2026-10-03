@@ -62,9 +62,14 @@ internal static class DoctorCommand
 
         try
         {
-            var state = new JsonResetStateStore(paths.StateFile).Load();
+            var stateStore = new JsonResetStateStore(paths.StateFile);
+            var state = stateStore.Load();
             Report(state.Pending is null ? Level.Ok : Level.Warn, "State",
                 state.Pending is null ? "no unresolved reset attempt" : "unresolved reset attempt; run `resetme reset`");
+            if (stateStore.LastLoadWarning is { } warning)
+            {
+                Report(Level.Warn, "State file", warning);
+            }
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or System.Text.Json.JsonException)
         {

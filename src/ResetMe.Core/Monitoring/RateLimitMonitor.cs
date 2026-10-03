@@ -24,7 +24,8 @@ public sealed record MonitorTiming(
             poll,
             blocked,
             TimeSpan.FromSeconds(60),
-            [TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(30)]);
+            // Quick retries for blips, then slower so a missing or stopped Codex costs almost nothing.
+            [.. new[] { 1, 2, 5, 10, 30, 60, 120, 300 }.Select(s => TimeSpan.FromSeconds(s))]);
     }
 }
 
@@ -72,6 +73,7 @@ public sealed class RateLimitMonitor
     /// <summary>Runs until cancelled. Never throws for Codex outages; it reconnects instead.</summary>
     public async Task RunAsync(CancellationToken cancellationToken)
     {
+        ReportPendingAttempt();
         var failures = 0;
         while (!cancellationToken.IsCancellationRequested)
         {
@@ -92,7 +94,15 @@ public sealed class RateLimitMonitor
                 var backoff = _timing.ReconnectBackoff;
                 var delay = backoff.Count == 0 ? TimeSpan.Zero : backoff[Math.Min(failures, backoff.Count - 1)];
                 failures++;
-                MonitorLog.Unavailable(_logger, ex, delay.TotalSeconds);
+                if (failures == 1 || failures % 10 == 0)
+                {
+                    MonitorLog.Unavailable(_logger, ex, delay.TotalSeconds);
+                }
+                else
+                {
+                    MonitorLog.StillUnavailable(_logger, failures, delay.TotalSeconds);
+                }
+
                 _observer.OnUnavailable(ex, delay);
                 if (!await DelayAsync(delay, cancellationToken).ConfigureAwait(false))
                 {
@@ -106,6 +116,24 @@ public sealed class RateLimitMonitor
                     await connection.DisposeAsync().ConfigureAwait(false);
                 }
             }
+        }
+    }
+
+    /// <summary>An attempt left unresolved by a crash or an unverifiable result needs the user.</summary>
+    private void ReportPendingAttempt()
+    {
+        try
+        {
+            if (_store.Load().Pending is { } pending)
+            {
+                MonitorLog.PendingAttempt(_logger, pending.IdempotencyKey, pending.StartedAt);
+                _observer.OnPendingAttempt(pending);
+            }
+        }
+        catch (InvalidDataException ex)
+        {
+            MonitorLog.ResetFailed(_logger, ex);
+            _observer.OnResetFailed(ex);
         }
     }
 

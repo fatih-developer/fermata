@@ -48,13 +48,7 @@ internal static class LogsCommand
         var collected = new List<string>();
         foreach (var file in files)
         {
-            string[] fileLines;
-            using (var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-            using (var reader = new StreamReader(stream))
-            {
-                fileLines = reader.ReadToEnd().Split('\n', StringSplitOptions.RemoveEmptyEntries);
-            }
-
+            var fileLines = ReadWithRetry(file).Split('\n', StringSplitOptions.RemoveEmptyEntries);
             collected.InsertRange(0, fileLines.TakeLast(tail - collected.Count));
             if (collected.Count >= tail)
             {
@@ -63,6 +57,24 @@ internal static class LogsCommand
         }
 
         return collected;
+    }
+
+    /// <summary>Writers hold the file exclusively for a few milliseconds per batch.</summary>
+    private static string ReadWithRetry(string file)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                using var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                using var reader = new StreamReader(stream);
+                return reader.ReadToEnd();
+            }
+            catch (IOException) when (attempt < 50)
+            {
+                Thread.Sleep(20);
+            }
+        }
     }
 
     private static string Pretty(string line)

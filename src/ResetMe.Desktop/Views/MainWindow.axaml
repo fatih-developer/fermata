@@ -42,6 +42,15 @@
         </Grid>
       </Border>
 
+      <!-- Unresolved attempt -->
+      <Border CornerRadius="8" Padding="14" BorderBrush="#D99A1E" BorderThickness="1" IsVisible="{Binding HasPendingAttempt}">
+        <StackPanel Spacing="8">
+          <TextBlock Text="Reset needs attention" FontWeight="SemiBold" />
+          <TextBlock Classes="hint" TextWrapping="Wrap" Text="{Binding PendingText}" />
+          <Button Content="Finish pending reset" HorizontalAlignment="Right" Command="{Binding FinishPendingCommand}" />
+        </StackPanel>
+      </Border>
+
       <!-- Usage -->
       <StackPanel Spacing="6">
         <Grid ColumnDefinitions="*,Auto">

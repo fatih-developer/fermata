@@ -69,6 +69,7 @@ public sealed partial class DesktopHost : IAsyncDisposable
         _notifier = notifierFactory(Options);
 
         ViewModel = new MainViewModel(ResetNowAsync, SaveSettingsAsync, OpenLogs);
+        ViewModel.SetFinishPendingAction(FinishPendingAsync);
         ViewModel.LoadSettings(Options, _autostart.GetStatus(AutostartTarget.Desktop).Enabled);
         foreach (var warning in config.Warnings)
         {
@@ -117,6 +118,30 @@ public sealed partial class DesktopHost : IAsyncDisposable
         {
             LogSettingsFailed(_logger, ex);
             ViewModel.SettingsMessage = $"Could not save: {ex.Message}";
+        }
+    }
+
+    /// <summary>Resumes the unresolved attempt with its original idempotency key (no new credit).</summary>
+    public async Task FinishPendingAsync()
+    {
+        var now = _time.GetUtcNow();
+        try
+        {
+            await using var connection = await _connector.ConnectAsync(CancellationToken.None).ConfigureAwait(true);
+            var report = await CreateResetManager(connection)
+                .ExecuteAsync(new ResetRequest(), CancellationToken.None)
+                .ConfigureAwait(true);
+            ReportReset(report, notify: true);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            LogResetNowFailed(_logger, ex);
+            ViewModel.AddEvent($"Finishing the pending reset failed: {ex.Message}", now);
+        }
+
+        if (_stateStore.Load().Pending is null)
+        {
+            ViewModel.ClearPendingAttempt();
         }
     }
 
@@ -341,6 +366,12 @@ internal sealed class DesktopObserver(DesktopHost host, IDesktopUi ui, TimeProvi
         var text = NotificationTexts.ForLimit(notice, time.GetUtcNow());
         ui.Post(() => host.ViewModel.AddEvent($"{text.Title}. {text.Body}", time.GetUtcNow()));
     }
+
+    public void OnPendingAttempt(PendingResetAttempt pending) => ui.Post(() =>
+    {
+        host.ViewModel.ShowPendingAttempt(pending.StartedAt);
+        host.ViewModel.AddEvent("An earlier reset attempt has no confirmed result.", time.GetUtcNow());
+    });
 
     public void OnNearLimit(NearLimitNotice notice, CodexUsage usage)
     {
