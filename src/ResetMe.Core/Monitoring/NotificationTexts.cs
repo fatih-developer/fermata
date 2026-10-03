@@ -47,6 +47,17 @@ public static class NotificationTexts
         return new Notification(NotificationKind.LimitReached, which, body.Trim());
     }
 
+    public static Notification ForNearLimit(NearLimitNotice notice, long availableCredits, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(notice);
+        var window = notice.Window == LimitWindowKind.FiveHour ? "5-hour" : "weekly";
+        var resets = notice.ResetsAt is { } at ? $"Resets in {Duration(at - now)}. " : "";
+        return new Notification(
+            NotificationKind.Info,
+            $"Codex {window} usage at {notice.UsedPercent:0}%",
+            $"{resets}{availableCredits} reset credit(s) available.");
+    }
+
     public static Notification ForReport(ResetReport report)
     {
         ArgumentNullException.ThrowIfNull(report);

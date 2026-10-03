@@ -41,6 +41,11 @@ public interface IMonitorObserver
 
     void OnLimitReached(LimitNotice notice);
 
+    /// <summary>A window crossed a near-limit threshold (once per threshold per window period).</summary>
+    void OnNearLimit(NearLimitNotice notice, CodexUsage usage)
+    {
+    }
+
     /// <summary>Confirm mode only. Returning false means "wait"; the episode is not offered again.</summary>
     Task<bool> ConfirmResetAsync(LimitNotice notice, CancellationToken cancellationToken);
 

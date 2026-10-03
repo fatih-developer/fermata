@@ -116,6 +116,13 @@ public sealed partial class MainViewModel : ObservableObject
     public partial bool NotificationsEnabled { get; set; } = true;
 
     [ObservableProperty]
+    public partial bool NearLimitEnabled { get; set; } = true;
+
+    /// <summary>"Warn at 80%, 90%, 95%" — label for the near-limit checkbox.</summary>
+    [ObservableProperty]
+    public partial string NearLimitLabel { get; set; } = "Warn when usage reaches 80%, 90%, 95%";
+
+    [ObservableProperty]
     public partial bool StartAtLogin { get; set; }
 
     [ObservableProperty]
@@ -206,6 +213,10 @@ public sealed partial class MainViewModel : ObservableObject
         IntervalSeconds = options.Monitor.IntervalSeconds;
         MinNaturalResetMinutes = options.Reset.MinTimeToNaturalResetMinutes;
         NotificationsEnabled = options.NotificationsEnabled;
+        NearLimitEnabled = options.NearLimit.Enabled;
+        NearLimitLabel = options.NearLimit.Thresholds.Count == 0
+            ? "Near-limit warnings (no thresholds configured)"
+            : "Warn when usage reaches " + string.Join(", ", options.NearLimit.Thresholds.Select(t => $"{t}%"));
         StartMinimized = options.StartMinimized;
         StartAtLogin = startAtLogin;
     }
@@ -218,6 +229,7 @@ public sealed partial class MainViewModel : ObservableObject
         current.Monitor.IntervalSeconds = Math.Max(MonitorOptions.MinimumIntervalSeconds, (int)IntervalSeconds);
         current.Reset.MinTimeToNaturalResetMinutes = Math.Max(0, (int)MinNaturalResetMinutes);
         current.NotificationsEnabled = NotificationsEnabled;
+        current.NearLimit.Enabled = NearLimitEnabled;
         current.StartMinimized = StartMinimized;
         return current;
     }

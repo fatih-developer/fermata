@@ -68,4 +68,7 @@ internal static partial class MonitorLog
 
     [LoggerMessage(209, LogLevel.Information, "Codex usable again")]
     public static partial void Recovered(ILogger logger);
+
+    [LoggerMessage(210, LogLevel.Information, "Near limit: {Window} window at {UsedPercent}% (threshold {Threshold}%)")]
+    public static partial void NearLimit(ILogger logger, string window, int threshold, double usedPercent);
 }

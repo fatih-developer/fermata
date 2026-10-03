@@ -310,6 +310,12 @@ internal sealed class DesktopObserver(DesktopHost host, IDesktopUi ui, TimeProvi
         ui.Post(() => host.ViewModel.AddEvent($"{text.Title}. {text.Body}", time.GetUtcNow()));
     }
 
+    public void OnNearLimit(NearLimitNotice notice, CodexUsage usage)
+    {
+        var text = NotificationTexts.ForNearLimit(notice, usage.AvailableResetCount, time.GetUtcNow());
+        ui.Post(() => host.ViewModel.AddEvent($"{text.Title}. {text.Body}", time.GetUtcNow()));
+    }
+
     public async Task<bool> ConfirmResetAsync(LimitNotice notice, CancellationToken cancellationToken)
     {
         var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);

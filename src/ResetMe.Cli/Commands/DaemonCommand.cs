@@ -71,6 +71,12 @@ internal sealed class DaemonObserver : IMonitorObserver
         Console.WriteLine($"{Stamp} LIMIT {text.Title}: {text.Body}");
     }
 
+    public void OnNearLimit(NearLimitNotice notice, CodexUsage usage)
+    {
+        var text = NotificationTexts.ForNearLimit(notice, usage.AvailableResetCount, DateTimeOffset.UtcNow);
+        Console.WriteLine($"{Stamp} NEAR_LIMIT {text.Title}: {text.Body}");
+    }
+
     public Task<bool> ConfirmResetAsync(LimitNotice notice, CancellationToken cancellationToken) => Task.FromResult(false);
 
     public void OnResetCompleted(ResetReport report)

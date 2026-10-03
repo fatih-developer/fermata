@@ -37,6 +37,13 @@ public sealed class NotifyingObserver : IMonitorObserver
         _inner.OnLimitReached(notice);
     }
 
+    public void OnNearLimit(NearLimitNotice notice, CodexUsage usage)
+    {
+        ArgumentNullException.ThrowIfNull(usage);
+        Notify(NotificationTexts.ForNearLimit(notice, usage.AvailableResetCount, _time.GetUtcNow()));
+        _inner.OnNearLimit(notice, usage);
+    }
+
     public Task<bool> ConfirmResetAsync(LimitNotice notice, CancellationToken cancellationToken) =>
         _inner.ConfirmResetAsync(notice, cancellationToken);
 

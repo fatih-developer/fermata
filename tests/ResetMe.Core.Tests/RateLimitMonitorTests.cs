@@ -114,6 +114,30 @@ public sealed class RateLimitMonitorTests : IDisposable
     }
 
     [Fact]
+    public async Task Near_limit_is_reported_once_per_threshold()
+    {
+        _client.ThenUsage(Usage.Healthy() with { FiveHour = new UsageWindow(85, 300, Usage.Now.AddHours(2)) });
+        _client.FallbackUsage = Usage.Healthy() with { FiveHour = new UsageWindow(86, 300, Usage.Now.AddHours(2)) };
+
+        await RunUntil(o => o.UsageReads >= 4);
+
+        var near = Assert.Single(_observer.NearLimits);
+        Assert.Equal(80, near.Threshold);
+        Assert.Empty(_observer.Notices);
+    }
+
+    [Fact]
+    public async Task Near_limit_can_be_disabled()
+    {
+        _options.NearLimit.Enabled = false;
+        _client.FallbackUsage = Usage.Healthy() with { FiveHour = new UsageWindow(96, 300, Usage.Now.AddHours(2)) };
+
+        await RunUntil(o => o.UsageReads >= 2);
+
+        Assert.Empty(_observer.NearLimits);
+    }
+
+    [Fact]
     public async Task Manual_mode_only_reports()
     {
         _options.Mode = GuardMode.Manual;
@@ -277,6 +301,10 @@ public sealed class RateLimitMonitorTests : IDisposable
         public int AuthRequired { get; private set; }
 
         public List<LimitNotice> Notices { get; } = [];
+
+        public List<NearLimitNotice> NearLimits { get; } = [];
+
+        public void OnNearLimit(NearLimitNotice notice, CodexUsage usage) => NearLimits.Add(notice);
 
         public List<ResetReport> Reports { get; } = [];
 

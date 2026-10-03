@@ -144,6 +144,12 @@ internal sealed class ConsoleWatchObserver : IMonitorObserver
     /// <summary>Without an interactive stdin confirm mode only reports (and suggests `resetme reset`).</summary>
     public bool CanConfirm => !Console.IsInputRedirected;
 
+    public void OnNearLimit(NearLimitNotice notice, CodexUsage usage)
+    {
+        var text = NotificationTexts.ForNearLimit(notice, usage.AvailableResetCount, DateTimeOffset.UtcNow);
+        Console.WriteLine($"{Clock}  NEAR LIMIT: {text.Title}. {text.Body}");
+    }
+
     public async Task<bool> ConfirmResetAsync(LimitNotice notice, CancellationToken cancellationToken)
     {
         Console.Write("Use reset credit? [y/N] ");

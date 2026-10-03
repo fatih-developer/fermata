@@ -102,6 +102,7 @@
                            Value="{Binding MinNaturalResetMinutes}" />
           </Grid>
           <CheckBox Content="Desktop notifications" IsChecked="{Binding NotificationsEnabled}" />
+          <CheckBox Content="{Binding NearLimitLabel}" IsChecked="{Binding NearLimitEnabled}" />
           <CheckBox Content="Start ResetMe at login" IsChecked="{Binding StartAtLogin}" />
           <CheckBox Content="Start hidden in the tray / menu bar" IsChecked="{Binding StartMinimized}" />
           <Grid ColumnDefinitions="*,Auto">

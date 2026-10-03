@@ -93,6 +93,11 @@ public sealed class TomlConfigStore
             # Extra consume tries with the SAME idempotency key after a timeout.
             consume_retry_max = {o.Reset.ConsumeRetryMax}
 
+            [near_limit]
+            # Warn once per threshold while a window fills up (percent used).
+            enabled = {B(o.NearLimit.Enabled)}
+            thresholds = [{string.Join(", ", o.NearLimit.Thresholds)}]
+
             [automatic]
             max_resets_per_day = {o.Automatic.MaxResetsPerDay}
             max_resets_per_week = {o.Automatic.MaxResetsPerWeek}
@@ -161,6 +166,21 @@ public sealed class TomlConfigStore
             r.ConsumeRetryMax = NonNegative(reset.ConsumeRetryMax, r.ConsumeRetryMax, "reset.consume_retry_max", warnings);
         }
 
+        if (file.NearLimit is { } near)
+        {
+            options.NearLimit.Enabled = near.Enabled ?? options.NearLimit.Enabled;
+            if (near.Thresholds is { } thresholds)
+            {
+                var valid = thresholds.Where(t => t is > 0 and < 100).Distinct().Order().ToList();
+                if (valid.Count != thresholds.Count)
+                {
+                    warnings.Add("near_limit.thresholds must be distinct values between 1 and 99; invalid entries ignored.");
+                }
+
+                options.NearLimit.Thresholds = valid;
+            }
+        }
+
         if (file.Automatic is { } automatic)
         {
             var a = options.Automatic;
@@ -225,6 +245,8 @@ internal sealed class ConfigFile
 
     public AutomaticSection? Automatic { get; set; }
 
+    public NearLimitSection? NearLimit { get; set; }
+
     public CodexSection? Codex { get; set; }
 
     public LoggingSection? Logging { get; set; }
@@ -271,6 +293,13 @@ internal sealed class ResetSection
     public int? MinTimeToNaturalResetMinutes { get; set; }
 
     public int? ConsumeRetryMax { get; set; }
+}
+
+internal sealed class NearLimitSection
+{
+    public bool? Enabled { get; set; }
+
+    public List<int>? Thresholds { get; set; }
 }
 
 internal sealed class AutomaticSection

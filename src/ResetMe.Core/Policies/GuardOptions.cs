@@ -20,6 +20,8 @@ public sealed class GuardOptions
 
     public AutomaticOptions Automatic { get; set; } = new();
 
+    public NearLimitOptions NearLimit { get; set; } = new();
+
     public LoggingOptions Logging { get; set; } = new();
 
     public bool NotificationsEnabled { get; set; } = true;
@@ -73,6 +75,14 @@ public sealed class LoggingOptions
     public Microsoft.Extensions.Logging.LogLevel Level { get; set; } = Microsoft.Extensions.Logging.LogLevel.Information;
 
     public int RetentionDays { get; set; } = 14;
+}
+
+/// <summary>Warnings before a window is exhausted (PRD §33).</summary>
+public sealed class NearLimitOptions
+{
+    public bool Enabled { get; set; } = true;
+
+    public List<int> Thresholds { get; set; } = [80, 90, 95];
 }
 
 public sealed class AutomaticOptions

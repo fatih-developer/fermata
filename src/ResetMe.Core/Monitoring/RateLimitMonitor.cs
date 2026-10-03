@@ -44,6 +44,7 @@ public sealed class RateLimitMonitor
     private readonly TimeProvider _time;
     private readonly ILogger _logger;
     private readonly HashSet<string> _seenEpisodes = [];
+    private readonly NearLimitTracker _nearLimit;
     private volatile bool _accountDirty = true;
     private bool _wasBlocked;
 
@@ -58,6 +59,7 @@ public sealed class RateLimitMonitor
         ILogger<RateLimitMonitor>? logger = null)
     {
         _logger = logger ?? NullLogger<RateLimitMonitor>.Instance;
+        _nearLimit = new NearLimitTracker(options.NearLimit.Enabled ? options.NearLimit.Thresholds : []);
         _connector = connector;
         _resetManagerFactory = resetManagerFactory;
         _store = store;
@@ -181,6 +183,11 @@ public sealed class RateLimitMonitor
 
                 _wasBlocked = assessment.Blocked;
                 _observer.OnUsage(usage, assessment);
+                foreach (var near in _nearLimit.Update(usage))
+                {
+                    MonitorLog.NearLimit(_logger, near.Window.ToString(), near.Threshold, near.UsedPercent);
+                    _observer.OnNearLimit(near, usage);
+                }
 
                 if (assessment.Blocked
                     && await HandleBlockedAsync(connection, usage, assessment, cancellationToken).ConfigureAwait(false))
