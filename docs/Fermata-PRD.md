@@ -1,11 +1,9 @@
-# Fermata (eski adıyla ResetMe) — Product Requirements Document (PRD)
-
-> Bu belge ürünün ResetMe adını taşıdığı dönemde yazıldı ve Codex limit izleme / reset kredisi kısmını tanımlar. Ürün 0.5.0 ile Fermata adını aldı ve bunun üzerine job katmanı eklendi: [`Fermata-Design.md`](Fermata-Design.md). Aşağıdaki "ResetMe" ifadeleri Fermata olarak okunmalıdır; komut adı artık `fermata`.
+# Fermata — Product Requirements Document (PRD)
 
 **Durum:** Draft v1.1 (Faz 0 spike sonrası revize)  
 **Tarih:** 2026-10-02  
 **İlgili:** [`CODEX_INTEGRATION.md`](CODEX_INTEGRATION.md) — App Server protokol doğrulaması  
-**Çalışma adı:** ResetMe  
+**Çalışma adı:** Fermata  
 **Hedef platformlar:** Windows, macOS, Linux  
 **Ürün tipi:** Cross-platform local companion / background service + CLI + optional desktop UI
 
@@ -13,7 +11,7 @@
 
 ## 1. Ürün Özeti
 
-ResetMe, Codex kullanımı sırasında 5 saatlik veya haftalık kullanım limiti dolduğunda bunu tespit eden, kullanılabilir reset hakkını kontrol eden ve kullanıcıya reset kullanma seçeneği sunan işletim sistemi bağımsız bir yardımcı uygulamadır.
+Fermata, Codex kullanımı sırasında 5 saatlik veya haftalık kullanım limiti dolduğunda bunu tespit eden, kullanılabilir reset hakkını kontrol eden ve kullanıcıya reset kullanma seçeneği sunan işletim sistemi bağımsız bir yardımcı uygulamadır.
 
 Ürün Codex'in kendisini değiştirmez. Codex ile yerel olarak çalışan ayrı bir companion uygulama olarak tasarlanır.
 
@@ -21,7 +19,7 @@ Temel amaç:
 
 > Kullanıcı Codex ile uzun süreli geliştirme yaparken limite takıldığında durumu manuel olarak kontrol etmek zorunda kalmadan reset hakkını güvenli şekilde kullanabilsin ve çalışmaya devam edebilsin.
 
-**Kapsam notu:** ResetMe limiti açar, ancak limite takılıp durmuş bir Codex oturumunu/turn'ünü **otomatik olarak devam ettirmez**. Reset sonrası kullanıcı Codex'te işlemi kendisi yeniden başlatır (retry / "continue"). Durmuş oturumun otomatik devamı MVP kapsamı dışındadır.
+**Kapsam notu:** Fermata limiti açar, ancak limite takılıp durmuş bir Codex oturumunu/turn'ünü **otomatik olarak devam ettirmez**. Reset sonrası kullanıcı Codex'te işlemi kendisi yeniden başlatır (retry / "continue"). Durmuş oturumun otomatik devamı MVP kapsamı dışındadır.
 
 ---
 
@@ -132,11 +130,11 @@ Codex CLI, Codex Desktop veya Codex tabanlı geliştirme araçlarını yoğun ku
 ```text
 Kullanıcı Codex ile çalışıyor
         ↓
-ResetMe limitleri izliyor
+Fermata limitleri izliyor
         ↓
 5 saatlik veya haftalık limit doluyor
         ↓
-ResetMe kullanılabilir reset hakkını kontrol ediyor
+Fermata kullanılabilir reset hakkını kontrol ediyor
         ↓
 Reset hakkı varsa bildirim gösteriliyor
         ↓
@@ -184,7 +182,7 @@ offerReset =
     AND NOT (timeToNaturalUnblock < reset.min_time_to_natural_reset)
 ```
 
-`timeToNaturalUnblock`: Engelleyen **tüm** pencerelerin `resetsAt` değerlerinin en büyüğü ile şimdiki zaman arasındaki fark. Örneğin yalnızca 5 saatlik pencere doluysa ve 8 dakika içinde kendiliğinden açılacaksa reset teklif edilmez. Kullanıcıya "8 dk sonra açılacak" bilgisi gösterilir. Manual `resetme reset` komutu bu eşiği bir uyarıyla geçebilir.
+`timeToNaturalUnblock`: Engelleyen **tüm** pencerelerin `resetsAt` değerlerinin en büyüğü ile şimdiki zaman arasındaki fark. Örneğin yalnızca 5 saatlik pencere doluysa ve 8 dakika içinde kendiliğinden açılacaksa reset teklif edilmez. Kullanıcıya "8 dk sonra açılacak" bilgisi gösterilir. Manual `fermata reset` komutu bu eşiği bir uyarıyla geçebilir.
 
 İki limitin aynı anda dolması gerekmez. Kredi iki pencereyi birlikte sıfırladığı için hangi pencerenin engellediğinden bağımsız olarak tek kredi yeterlidir.
 
@@ -289,7 +287,7 @@ Okunması gereken minimum bilgiler (protokol eşlemesi `CODEX_INTEGRATION.md` §
 
 Background service belirli aralıklarla limit durumunu kontrol etmelidir.
 
-- **Birincil sinyal: polling.** ResetMe'nin kendi App Server instance'ı, kullanıcının başka bir Codex sürecindeki kullanımını push ile göremeyebilir.
+- **Birincil sinyal: polling.** Fermata'nin kendi App Server instance'ı, kullanıcının başka bir Codex sürecindeki kullanımını push ile göremeyebilir.
 - **İkincil sinyal: `account/rateLimits/updated` push bildirimi.** Bildirim geldiğinde hemen yeniden okuma tetiklenir.
 - Background poll'lar `excludeResetCreditDetails: true` ile yapılır (hafif okuma). Detaylı okuma yalnızca engel tespit edildiğinde ve reset öncesinde yapılır.
 
@@ -401,7 +399,7 @@ Bildirim mevcut değilse CLI fallback kullanılmalıdır.
 
 **MVP:** MVP-2. MVP-1'de yalnızca terminal çıktısı ve terminal bell kullanılır.
 
-**Not:** MVP-1'de Confirm mode yalnızca `resetme watch` ön planda (TTY) çalışırken onay alabilir. TTY olmayan arka plan sürecinde onay, bildirim aksiyonları üzerinden alınır (MVP-2). O zamana kadar TTY yoksa durum yalnızca loglanır ve `status` çıktısında gösterilir.
+**Not:** MVP-1'de Confirm mode yalnızca `fermata watch` ön planda (TTY) çalışırken onay alabilir. TTY olmayan arka plan sürecinde onay, bildirim aksiyonları üzerinden alınır (MVP-2). O zamana kadar TTY yoksa durum yalnızca loglanır ve `status` çıktısında gösterilir.
 
 ---
 
@@ -410,11 +408,11 @@ Bildirim mevcut değilse CLI fallback kullanılmalıdır.
 Minimum CLI:
 
 ```bash
-resetme status
-resetme watch
-resetme reset
-resetme config
-resetme doctor
+fermata status
+fermata watch
+fermata reset
+fermata config
+fermata doctor
 ```
 
 Tüm komutlar MVP-1 kapsamındadır.
@@ -422,10 +420,10 @@ Tüm komutlar MVP-1 kapsamındadır.
 `reset` seçenekleri:
 
 ```bash
-resetme reset            # onay ister
-resetme reset --yes      # onaysız (script kullanımı)
-resetme reset --force    # min_time_to_natural_reset eşiğini uyarıyla geçer
-resetme reset --verbose  # ham outcome ve doğrulama adımlarını yazdırır
+fermata reset            # onay ister
+fermata reset --yes      # onaysız (script kullanımı)
+fermata reset --force    # min_time_to_natural_reset eşiğini uyarıyla geçer
+fermata reset --verbose  # ham outcome ve doğrulama adımlarını yazdırır
 ```
 
 ---
@@ -468,7 +466,7 @@ Action      RESET_AVAILABLE
 Kurulum ve bağlantı sorunlarını kontrol etmelidir.
 
 ```bash
-resetme doctor
+fermata doctor
 ```
 
 Kontroller:
@@ -482,7 +480,7 @@ Kontroller:
 - Notification desteği var mı?
 - Config okunabiliyor mu?
 - Config/state dosya izinleri doğru mu?
-- Başka bir ResetMe instance'ı lock'u tutuyor mu?
+- Başka bir Fermata instance'ı lock'u tutuyor mu?
 
 **MVP:** MVP-1
 
@@ -493,7 +491,7 @@ Kontroller:
 Aynı anda `watch`, daemon ve desktop çalışabilir. Bu durumda yalnızca **bir süreç** reset başlatabilir.
 
 - Reset akışı (`Resetting` başlangıcından `Verifying` sonuna kadar) OS seviyesinde bir **exclusive file lock** altında yürütülür (`state.lock`).
-- Lock alınamazsa ikinci süreç reset başlatmaz. "Başka bir ResetMe örneği reset işlemini yürütüyor" mesajı gösterir.
+- Lock alınamazsa ikinci süreç reset başlatmaz. "Başka bir Fermata örneği reset işlemini yürütüyor" mesajı gösterir.
 - State dosyası atomik yazılır (temp dosya + rename).
 - Lock alındıktan sonra state yeniden okunur. Devam eden bir deneme (`pendingIdempotencyKey`) varsa yeni deneme başlatılmaz, mevcut deneme sonuçlandırılır.
 
@@ -519,7 +517,7 @@ Desktop uygulama şu özellikleri sağlar:
 Örnek:
 
 ```text
-ResetMe
+Fermata
 
 5 hour
 ████████░░ 82%
@@ -551,14 +549,14 @@ System Tray / AppIndicator destekleniyorsa kullanılır.
 
 Tray desteği olmayan desktop environment'larda CLI/background service çalışmaya devam eder.
 
-**Uygulama (MVP-2):** Avalonia `TrayIcon` (Windows tray, macOS menu bar extra, Linux StatusNotifierItem). Tray olmayan masaüstlerinde (ör. eklentisiz GNOME) uygulamayı yeniden başlatmak, çalışan örneğin penceresini öne getirir (tek örnek + named pipe). Başsız Linux için `resetme daemon` + `systemd --user` servisi kullanılır.
+**Uygulama (MVP-2):** Avalonia `TrayIcon` (Windows tray, macOS menu bar extra, Linux StatusNotifierItem). Tray olmayan masaüstlerinde (ör. eklentisiz GNOME) uygulamayı yeniden başlatmak, çalışan örneğin penceresini öne getirir (tek örnek + named pipe). Başsız Linux için `fermata daemon` + `systemd --user` servisi kullanılır.
 
 ---
 
 ## 13. Önerilen Teknik Mimari
 
 ```text
-ResetMe
+Fermata
 │
 ├── Core
 │   ├── Domain
@@ -689,7 +687,7 @@ account/updated              (notif.)    auth/plan değişimi
 error                        (notif.)    turn hatası (usageLimitExceeded fallback)
 ```
 
-**Lifecycle (MVP-1):** ResetMe `codex app-server` sürecini stdio transport ile kendi child process'i olarak başlatır. Auth `~/.codex` üzerinden paylaşılır. Child process çökerse backoff ile yeniden başlatılır.
+**Lifecycle (MVP-1):** Fermata `codex app-server` sürecini stdio transport ile kendi child process'i olarak başlatır. Auth `~/.codex` üzerinden paylaşılır. Child process çökerse backoff ile yeniden başlatılır.
 
 Bu metodlar uygulama içinde doğrudan dağınık şekilde kullanılmamalıdır.
 
@@ -775,7 +773,7 @@ Kurallar:
 
 - `Resetting` durumuna girmeden **önce** `pendingIdempotencyKey` state'e yazılır.
 - Süreç `Resetting` veya `Verifying` sırasında çökerse, yeniden başlangıçta `pendingIdempotencyKey` bulunur ve **aynı key ile** akış sürdürülür. Yeni key üretilmez.
-- `ResetUnconfirmed` durumundan yalnızca kullanıcı aksiyonu (`resetme reset --resume` veya UI) veya `Healthy` gözlemi ile çıkılır.
+- `ResetUnconfirmed` durumundan yalnızca kullanıcı aksiyonu (`fermata reset --resume` veya UI) veya `Healthy` gözlemi ile çıkılır.
 
 ---
 
@@ -882,19 +880,19 @@ Kullanıcı mesajları, Codex promptları ve proje kaynak kodları saklanmaz.
 ### Windows
 
 ```text
-%APPDATA%/ResetMe/
+%APPDATA%/Fermata/
 ```
 
 ### macOS
 
 ```text
-~/Library/Application Support/ResetMe/
+~/Library/Application Support/Fermata/
 ```
 
 ### Linux
 
 ```text
-~/.config/resetme/
+~/.config/fermata/
 ```
 
 Platform-specific path yalnızca infrastructure adapter tarafından belirlenmelidir.
@@ -962,7 +960,7 @@ gerekecektir.
 Desteklenen minimum kullanım:
 
 ```bash
-resetme watch
+fermata watch
 ```
 
 Desktop environment bulunması zorunlu değildir.
@@ -1076,7 +1074,7 @@ Config ve state dosyaları yalnızca ilgili OS kullanıcısı tarafından erişi
 - macOS / Linux: `0600` dosya, `0700` dizin.
 - Windows: Miras alınan ACL kaldırılır, yalnızca mevcut kullanıcıya (ve SYSTEM'e) erişim verilir.
 
-ResetMe Codex auth dosyalarını (`~/.codex/auth.json` vb.) **doğrudan okumaz**. Auth işlemleri tamamen App Server üzerinden yürür.
+Fermata Codex auth dosyalarını (`~/.codex/auth.json` vb.) **doğrudan okumaz**. Auth işlemleri tamamen App Server üzerinden yürür.
 
 ---
 
@@ -1116,14 +1114,14 @@ Information
 CLI:
 
 ```bash
-resetme logs [-n N] [--json] [--path]
+fermata logs [-n N] [--json] [--path]
 ```
 
 **Uygulama (MVP-1):**
 
-- Dosya: `<veri dizini>/logs/resetme-YYYY-MM-DD.log`, satır başına bir JSON nesnesi (`ts`, `level`, `category`, `event`, `msg`, `props`, `exception`).
+- Dosya: `<veri dizini>/logs/fermata-YYYY-MM-DD.log`, satır başına bir JSON nesnesi (`ts`, `level`, `category`, `event`, `msg`, `props`, `exception`).
 - Saklama: `[logging] retention_days` (varsayılan 14). Günlük dosya üst sınırı 20 MB.
-- Birden fazla ResetMe süreci aynı dosyaya güvenli şekilde yazabilir (kısa, kilitli ekleme ve yeniden deneme).
+- Birden fazla Fermata süreci aynı dosyaya güvenli şekilde yazabilir (kısa, kilitli ekleme ve yeniden deneme).
 - Tüm metinler §28 gereği `LogSanitizer`'dan geçer (e-posta, Bearer, JWT, `sk-` ve `gh*_` anahtarları, `token=`/`password:` atamaları).
 - Codex isteklerinin parametreleri ve yanıtları loglanmaz. Yalnızca metod adı, süre ve hata loglanır.
 - Olay ID aralıkları: 1–3 CLI, 1xx reset, 2xx monitör, 3xx Codex entegrasyonu.
@@ -1234,7 +1232,7 @@ ayrı process davranışı gösterebilir.
 ### Watch
 
 ```bash
-resetme watch
+fermata watch
 ```
 
 Örnek:
@@ -1260,7 +1258,7 @@ Menu bar / tray ana interaction olabilir.
 Menu:
 
 ```text
-ResetMe
+Fermata
 ────────────────
 5h usage        82%
 Weekly          63%
@@ -1359,15 +1357,15 @@ Desktop integration.
 
 | Parça | Uygulama |
 |---|---|
-| Masaüstü uygulaması | `ResetMeApp` (Avalonia 12): durum penceresi, ayarlar, reset onay penceresi (§38), son olaylar. Kapatınca tray'e gizlenir. |
+| Masaüstü uygulaması | `FermataApp` (Avalonia 12): durum penceresi, ayarlar, reset onay penceresi (§38), son olaylar. Kapatınca tray'e gizlenir. |
 | Tray / menu bar | Menü (§37): kullanım, krediler, "Reset now…", Mode alt menüsü, pencere, loglar, çıkış. Simge çalışma anında çizilir (kullanım halkası, sağlık rengi). |
 | Bildirimler | Windows: PowerShell WinRT toast. macOS: `osascript display notification`. Linux: `notify-send`. Yoksa terminal/log. Limit olayı ve reset sonucu başına bir bildirim (§32). |
-| Açılışta başlatma | Windows: HKCU Run (tray uygulaması). macOS: LaunchAgent (`com.resetme.desktop` / `com.resetme.daemon`). Linux: XDG autostart (masaüstü) veya `systemd --user` servisi (daemon). CLI: `resetme autostart status/enable/disable [--target]`; uygulamada "Start ResetMe at login". |
-| Arka plan servisi | `resetme daemon`: başsız monitör; soru sormaz, confirm modunda yalnızca bildirir; automatic modda tüm korumalarla reset yapar. |
-| Paketleme | `scripts/package.sh <rid>`: Windows zip, Linux tar.gz, macOS `ResetMe.app` (LSUIElement, yalnızca menü çubuğu). CLI ve uygulama yan yana; büyük/küçük harf çakışması kontrolü. |
+| Açılışta başlatma | Windows: HKCU Run (tray uygulaması). macOS: LaunchAgent (`com.fermata.desktop` / `com.fermata.daemon`). Linux: XDG autostart (masaüstü) veya `systemd --user` servisi (daemon). CLI: `fermata autostart status/enable/disable [--target]`; uygulamada "Start Fermata at login". |
+| Arka plan servisi | `fermata daemon`: başsız monitör; soru sormaz, confirm modunda yalnızca bildirir; automatic modda tüm korumalarla reset yapar. |
+| Paketleme | `scripts/package.sh <rid>`: Windows zip, Linux tar.gz, macOS `Fermata.app` (LSUIElement, yalnızca menü çubuğu). CLI ve uygulama yan yana; büyük/küçük harf çakışması kontrolü. |
 | Doğrulama | Headless render testleri (ekran görüntüleri), host ve view model testleri; CI'da her OS'ta paket + sahte Codex'e karşı daemon smoke testi. Windows'ta gerçek pencereyle UI Automation e2e (onay → tek consume) yapıldı. |
 
-Uygulamanın çalıştırılabilir adı `ResetMeApp`'tir: `ResetMe` adı, büyük/küçük harf ayırmayan dosya sistemlerinde (macOS, Windows) `resetme` CLI'ı ile çakışır.
+Uygulamanın çalıştırılabilir adı `FermataApp`'tir: `Fermata` adı, büyük/küçük harf ayırmayan dosya sistemlerinde (macOS, Windows) `fermata` CLI'ı ile çakışır.
 
 ---
 
@@ -1382,10 +1380,10 @@ Automation improvements.
 | Automatic mode | Masaüstünde açık onay penceresi (korumalar listelenir); reddedilirse önceki moda döner. CLI'da `config.toml` ile. |
 | Near-limit warnings | `[near_limit]` (varsayılan 80/90/95). Eşik başına pencere dönemi içinde bir kez; aynı anda birden fazla eşik geçilirse yalnızca en yükseği. Terminal, daemon logu, masaüstü olayları ve bildirim. |
 | Better retry/recovery | Yarım kalan deneme başlangıçta bildirilir, masaüstünde "Finish pending reset" (aynı idempotency key). `state.json.bak` ile bozuk durum dosyasından kurtarma. Yeniden bağlanma 1 sn → 5 dk, log seyreltme. Eşzamanlı log yazımında satır kaybı düzeltildi. |
-| Self-update | `resetme update [--check]`, masaüstünde günde bir kontrol + "Install update". GitHub Releases + `SHA256SUMS.txt` doğrulaması; Unix'te yerinde klasör değişimi, Windows'ta çıkıştan sonra çalışan yardımcı (hata olursa geri alma). Geliştirme derlemeleri hiçbir zaman değiştirilmez. `[updates] check_automatically`. Release: `v*` tag'i → `.github/workflows/release.yml`. |
-| Diagnostics export | `resetme diagnostics`, masaüstünde "Export diagnostics": sistem bilgisi, config, state, son 7 günün logları, doctor çıktısı. Yeniden temizlenir; kullanıcı profili yolu `~` olur. |
+| Self-update | `fermata update [--check]`, masaüstünde günde bir kontrol + "Install update". GitHub Releases + `SHA256SUMS.txt` doğrulaması; Unix'te yerinde klasör değişimi, Windows'ta çıkıştan sonra çalışan yardımcı (hata olursa geri alma). Geliştirme derlemeleri hiçbir zaman değiştirilmez. `[updates] check_automatically`. Release: `v*` tag'i → `.github/workflows/release.yml`. |
+| Diagnostics export | `fermata diagnostics`, masaüstünde "Export diagnostics": sistem bilgisi, config, state, son 7 günün logları, doctor çıktısı. Yeniden temizlenir; kullanıcı profili yolu `~` olur. |
 
-Güncelleme kontrolü, ResetMe'nin Codex dışındaki tek ağ isteğidir: herkese açık GitHub release bilgisini okur, kullanıcıya ait veri göndermez (User-Agent yalnızca sürümü içerir).
+Güncelleme kontrolü, Fermata'nin Codex dışındaki tek ağ isteğidir: herkese açık GitHub release bilgisini okur, kullanıcıya ait veri göndermez (User-Agent yalnızca sürümü içerir).
 
 - Automatic mode
 - Near-limit warnings
@@ -1424,7 +1422,7 @@ Self-contained deployment tercih edilmelidir.
 
 ### Windows kod imzalama
 
-Windows 11'de **Smart App Control** açık olan kullanıcılarda imzasız ve itibarı bilinmeyen binary'ler engellenebilir. Bu durum geliştirme sırasında gözlendi (2026-10-02): imzasız `ResetMe.Core.dll` Code Integrity tarafından engellendi (olay 3033/3077), aynı kodun farklı hash'li derlemesi ise yüklendi. Karar binary bazında ve öngörülemez.
+Windows 11'de **Smart App Control** açık olan kullanıcılarda imzasız ve itibarı bilinmeyen binary'ler engellenebilir. Bu durum geliştirme sırasında gözlendi (2026-10-02): imzasız `Fermata.Core.dll` Code Integrity tarafından engellendi (olay 3033/3077), aynı kodun farklı hash'li derlemesi ise yüklendi. Karar binary bazında ve öngörülemez.
 
 Bu nedenle Windows release'leri için:
 
@@ -1439,14 +1437,14 @@ Bu nedenle Windows release'leri için:
 Örnek:
 
 ```text
-resetme-win-x64.zip
-resetme-win-arm64.zip
+fermata-win-x64.zip
+fermata-win-arm64.zip
 
-resetme-macos-arm64.tar.gz
-resetme-macos-x64.tar.gz
+fermata-macos-arm64.tar.gz
+fermata-macos-x64.tar.gz
 
-resetme-linux-x64.tar.gz
-resetme-linux-arm64.tar.gz
+fermata-linux-x64.tar.gz
+fermata-linux-arm64.tar.gz
 ```
 
 İleri sürüm:
@@ -1464,23 +1462,23 @@ deb/rpm
 ## 45. Repository Yapısı
 
 ```text
-resetme/
+fermata/
 │
 ├── src/
-│   ├── ResetMe.Core/
-│   ├── ResetMe.Codex/
-│   ├── ResetMe.Daemon/
-│   ├── ResetMe.Cli/
-│   ├── ResetMe.Desktop/
-│   └── ResetMe.Platform/
+│   ├── Fermata.Core/
+│   ├── Fermata.Codex/
+│   ├── Fermata.Daemon/
+│   ├── Fermata.Cli/
+│   ├── Fermata.Desktop/
+│   └── Fermata.Platform/
 │
 ├── tests/
-│   ├── ResetMe.Core.Tests/
-│   ├── ResetMe.Codex.Tests/
-│   └── ResetMe.IntegrationTests/
+│   ├── Fermata.Core.Tests/
+│   ├── Fermata.Codex.Tests/
+│   └── Fermata.IntegrationTests/
 │
 ├── docs/
-│   ├── ResetMe-PRD.md
+│   ├── Fermata-PRD.md
 │   ├── TECHNICAL_ARCHITECTURE.md
 │   ├── CODEX_INTEGRATION.md
 │   ├── SECURITY.md
@@ -1492,7 +1490,7 @@ resetme/
 │   └── workflows/
 │
 ├── Directory.Build.props
-├── ResetMe.sln
+├── Fermata.sln
 └── README.md
 ```
 
@@ -1603,7 +1601,7 @@ Kredi iki pencereyi birlikte sıfırlar ve süreli olabilir. Doğal açılmaya a
 
 ### Polling görünürlüğü
 
-ResetMe'nin kendi App Server instance'ı, ayrı Codex süreçlerindeki kullanımı push ile göremeyebilir. Bu nedenle polling zorunludur. Polling sıklığının sunucu tarafında limite takılıp takılmadığı henüz doğrulanmadı.
+Fermata'nin kendi App Server instance'ı, ayrı Codex süreçlerindeki kullanımı push ile göremeyebilir. Bu nedenle polling zorunludur. Polling sıklığının sunucu tarafında limite takılıp takılmadığı henüz doğrulanmadı.
 
 ### Reset capability değişikliği
 
@@ -1690,7 +1688,7 @@ Bu yaklaşım Codex entegrasyonunun GUI geliştirmeden önce doğrulanmasını s
 İlk kullanılabilir sürümde kullanıcı şu komutu çalıştırabilmelidir:
 
 ```bash
-resetme watch
+fermata watch
 ```
 
 ve ardından sistem herhangi bir Codex limiti dolduğunda:

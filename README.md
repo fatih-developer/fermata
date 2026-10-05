@@ -27,8 +27,6 @@ It also starts jobs later (`--at 07:30`, `--in 2h`), picks up jobs after a reboo
   <img src="docs/images/confirm-window.png" alt="Reset confirmation dialog" width="400">
 </p>
 
-> Fermata was called **ResetMe** up to 0.4. On first start it copies the old settings and reset history; see [Migrating from ResetMe](#migrating-from-resetme).
-
 ## Contents
 
 - [Features](#features)
@@ -40,7 +38,6 @@ It also starts jobs later (`--at 07:30`, `--in 2h`), picks up jobs after a reboo
 - [Desktop app](#desktop-app)
 - [Configuration](#configuration)
 - [Safety and privacy](#safety-and-privacy)
-- [Migrating from ResetMe](#migrating-from-resetme)
 - [Architecture](#architecture)
 - [Building and testing](#building-and-testing)
 - [Status](#status)
@@ -242,15 +239,6 @@ Job data lives in `jobs/<id>/`: `job.json` (written atomically), `events.ndjson`
 - **Hooks never get in the way.** Every hook and the status line wrapper exit successfully in all cases.
 - **Updates are verified** against `SHA256SUMS.txt` before installing.
 
-## Migrating from ResetMe
-
-- On first start the tray app (and every CLI command that changes state) copies `config.toml`, `state.json` and `state.json.bak` from the old ResetMe data folder. A pending reset attempt keeps its idempotency key. The old folder is never deleted.
-- If the ResetMe tray app is still running, Fermata asks you to quit it first. Two monitors with two lock files could use two credits for one limit.
-- ResetMe's start-at-login entry is removed; if it was on, the Fermata tray app registers itself instead.
-- `fermata codex install` replaces the old `resetme` hooks, MCP server and skill. `fermata codex status` warns while any of them is left.
-- `RESETME_HOME` is still honoured.
-- Clients 0.3 and 0.4 cannot find the new package names, so install 0.5.0 once by hand.
-
 ## Architecture
 
 | Project | Responsibility |
@@ -258,7 +246,7 @@ Job data lives in `jobs/<id>/`: `job.json` (written atomically), `events.ndjson`
 | `Fermata.Core` | Domain model and limit rules, `ResetManager`; the job core: `Job`, `QuotaSnapshot`, `QuotaPolicy`, `JobPolicy` (pure) and `IJobProvider` |
 | `Fermata.Codex` | `codex app-server` client, `CodexDaemonClient` for the shared daemon, `CodexJobProvider` |
 | `Fermata.Claude` | `ClaudeCli`, `ClaudeJobProvider`, the `settings.json` installer, status line and hook handlers |
-| `Fermata.Platform` | Paths, TOML config, atomic files, locks, notifications, autostart and updates; the job store, `CheckpointWriter`, `JobScheduler` and the ResetMe migration |
+| `Fermata.Platform` | Paths, TOML config, atomic files, locks, notifications, autostart and updates; the job store, `CheckpointWriter` and `JobScheduler` |
 | `Fermata.Cli` | The `fermata` command line |
 | `Fermata.Desktop` | `FermataApp`, the Avalonia tray and menu bar app |
 
@@ -282,6 +270,6 @@ On Windows with Smart App Control, unsigned development builds of the desktop ap
 
 ## Status
 
-**0.5.0.** Supervised jobs for Codex and Claude Code, the rename from ResetMe and automatic migration, plus everything ResetMe had: CLI, tray and menu bar app, notifications, start at login, near-limit warnings, self-update and diagnostics.
+**0.5.0.** Supervised jobs for Codex and Claude Code, together with the Codex usage monitor and reset credits, CLI, tray and menu bar app, notifications, start at login, near-limit warnings, self-update and diagnostics.
 
 Still open: signed (Authenticode / notarized) releases. A few Claude Code behaviours need a real session to confirm, such as Stop-hook blocking in background sessions and the exact `rate_limits` payload; see the design notes.

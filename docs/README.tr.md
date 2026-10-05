@@ -11,15 +11,13 @@
 
 Uzun Codex ve Claude Code işlerini kullanım limitleri boyunca yöneten, yerel çalışan bir job supervisor. Fermata bir işi limit dolmadan durdurur (handoff notu + git checkpoint), reset zamanını bekler ve aynı oturumu kaldığı yerden sürdürür. İleri tarihli başlatma (`--at`, `--in`) ve bilgisayar yeniden başladıktan sonra kurtarma da yapar. Codex için ayrıca limit dolunca **sizin onayınızla** reset kredisi kullanır.
 
-Önceki adı ResetMe'ydi; ilk açılışta ayarlar ve reset geçmişi otomatik taşınır (aşağıda "ResetMe'den geçiş").
-
 - Tasarım (job katmanı, Codex ve Claude sağlayıcıları): [`docs/Fermata-Design.md`](Fermata-Design.md)
 - Ürün tanımı (Codex limit/reset kısmı): [`docs/Fermata-PRD.md`](Fermata-PRD.md)
 - Codex App Server protokolü: [`docs/CODEX_INTEGRATION.md`](CODEX_INTEGRATION.md)
 
 ## Durum
 
-0.5.0: ResetMe'nin tüm özellikleri (CLI, tray / menu bar uygulaması, bildirimler, açılışta başlatma, limite yaklaşma uyarıları, otomatik güncelleme, tanılama) ve job katmanı: `run`, `adopt`, `jobs`, `job`, `pause`, `resume`, `cancel`, `checkpoint`; Codex ve Claude Code sağlayıcıları; `fermata claude install`; MCP'de `fermata_jobs`; tray'de job satırları. Açık iş: imzalı (Authenticode / notarized) release'ler.
+0.5.0: Codex kullanım monitörü ve reset kredileri (CLI, tray / menu bar uygulaması, bildirimler, açılışta başlatma, limite yaklaşma uyarıları, otomatik güncelleme, tanılama) ve job katmanı: `run`, `adopt`, `jobs`, `job`, `pause`, `resume`, `cancel`, `checkpoint`; Codex ve Claude Code sağlayıcıları; `fermata claude install`; MCP'de `fermata_jobs`; tray'de job satırları. Açık iş: imzalı (Authenticode / notarized) release'ler.
 
 ## Gereksinimler
 
@@ -156,15 +154,6 @@ Loglar veri dizinindeki `logs/fermata-YYYY-MM-DD.log` dosyalarına JSON satırla
 
 Veri dizini: `%APPDATA%\Fermata` (Windows), `~/Library/Application Support/Fermata` (macOS), `~/.config/fermata` (Linux). `FERMATA_HOME` ile değiştirilebilir. Job'lar `jobs/<id>/` altındadır (`job.json`, `events.ndjson`, `checkpoints/`).
 
-## ResetMe'den geçiş
-
-- İlk açılışta (`FermataApp` ya da durum değiştiren CLI komutları) eski ResetMe veri dizini varsa ve Fermata dizini boşsa `config.toml`, `state.json` ve `state.json.bak` kopyalanır; bekleyen idempotency anahtarı korunur. Eski dizin silinmez.
-- ResetMe hâlâ çalışıyorsa geçiş durur ve kapatmanız istenir: iki ayrı kilit dosyası aynı limit için iki kredi harcayabilir.
-- ResetMe'nin açılışta başlatma kaydı silinir; masaüstü uygulaması kendini yeniden kaydeder.
-- `fermata codex install` eski `resetme` hook'larını, MCP sunucusunu ve skill'ini Fermata'nınkilerle değiştirir; `fermata codex status` eski kurulumu uyarır.
-- `RESETME_HOME` hâlâ okunur; yenisi `FERMATA_HOME`.
-- 0.3/0.4 sürümleri yeni paket adını (`fermata-<rid>.zip`) bulamaz; bir kez elle kurulum gerekir.
-
 ## Proje yapısı
 
 | Proje | Sorumluluk |
@@ -172,7 +161,7 @@ Veri dizini: `%APPDATA%\Fermata` (Windows), `~/Library/Application Support/Ferma
 | `Fermata.Core` | Domain modeli, limit/teklif kuralları, çifte reset korumalı `ResetManager`; job çekirdeği: `Job`, `QuotaSnapshot`, `QuotaPolicy`, `JobPolicy` (saf karar fonksiyonu), `IJobProvider` |
 | `Fermata.Codex` | `codex app-server` istemcisi, paylaşılan daemon istemcisi (`CodexDaemonClient`), `CodexJobProvider` |
 | `Fermata.Claude` | `ClaudeLocator`, `ClaudeCli`, `ClaudeJobProvider`, `settings.json` kurulumcusu, status line ve hook işleyicileri |
-| `Fermata.Platform` | Dosya yolları, TOML config, atomik dosyalar, kilitler, bildirimler, açılışta başlatma, güncelleme; job deposu, `CheckpointWriter`, `JobScheduler`, ResetMe göçü |
+| `Fermata.Platform` | Dosya yolları, TOML config, atomik dosyalar, kilitler, bildirimler, açılışta başlatma, güncelleme; job deposu, `CheckpointWriter`, `JobScheduler` |
 | `Fermata.Cli` | `fermata` komut satırı |
 | `Fermata.Desktop` | `FermataApp`: Avalonia tray / menu bar uygulaması |
 

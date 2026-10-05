@@ -2,7 +2,7 @@
 
 **Durum:** 0.5.0 ile uygulandı. Bu belge iki taslağın yerini alır: `archive/codex-quota-supervisor-design.md` ve `archive/claude-code-quota-supervisor.md`. Uygulama planı: [`plan/Fermata-Plan.md`](plan/Fermata-Plan.md).
 
-Fermata, ResetMe'nin (Codex limit izleme ve onaylı reset kredisi) üzerine kurulmuş bir **job katmanıdır**. Uzun Codex ve Claude Code işlerini kota bitmeden durdurur, reset zamanını bekler ve aynı oturumu sürdürür. Ayrı bir ürün değildir: monitör, Codex adaptörü, daemon bağlantısı, tray, bildirim, autostart ve güncelleme altyapısını paylaşır.
+Fermata, Codex limit izleme ve onaylı reset kredisinin üzerine kurulmuş bir **job katmanıdır**. Uzun Codex ve Claude Code işlerini kota bitmeden durdurur, reset zamanını bekler ve aynı oturumu sürdürür. Ayrı bir ürün değildir: monitör, Codex adaptörü, daemon bağlantısı, tray, bildirim, autostart ve güncelleme altyapısını paylaşır.
 
 ## 1. İlkeler
 
