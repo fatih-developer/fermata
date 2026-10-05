@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-label="Fermata: pause long agent jobs before the limit, resume after the reset">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#14213d"/>
+      <stop offset="1" stop-color="#1f3b5c"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="300" rx="24" fill="url(#bg)"/>
+  <!-- fermata sign: an arch over a dot -->
+  <g transform="translate(150 165)" fill="none" stroke="#f2b33d" stroke-linecap="round">
+    <path d="M -78 18 A 78 78 0 0 1 78 18" stroke-width="16"/>
+    <circle cx="0" cy="8" r="13" fill="#f2b33d" stroke="none"/>
+  </g>
+  <text x="290" y="150" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="88" font-weight="700" fill="#ffffff">Fermata</text>
+  <text x="294" y="200" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="28" fill="#c9d6e8">Long Codex and Claude Code jobs that survive usage limits:</text>
+  <text x="294" y="238" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="28" fill="#c9d6e8">checkpoint before the limit, wait for the reset, resume.</text>
+</svg>
