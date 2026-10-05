@@ -1,7 +1,7 @@
 name: release
 
 # Push a tag like v0.3.0 to publish a GitHub Release with every package and SHA256SUMS.txt,
-# which `resetme update` and the desktop app's update check consume.
+# which `fermata update` and the desktop app's update check consume.
 on:
   push:
     tags: ['v*']
@@ -36,7 +36,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: pkg-${{ matrix.rid }}
-          path: artifacts/package/resetme-*
+          path: artifacts/package/fermata-*
           if-no-files-found: error
 
   publish:
@@ -51,7 +51,7 @@ jobs:
       - name: Checksums
         run: |
           cd dist
-          sha256sum resetme-* > SHA256SUMS.txt
+          sha256sum fermata-* > SHA256SUMS.txt
           cat SHA256SUMS.txt
       - name: Create release
         env:
@@ -61,5 +61,5 @@ jobs:
           case "$GITHUB_REF_NAME" in *-*) prerelease="--prerelease" ;; esac
           gh release create "$GITHUB_REF_NAME" dist/* \
             --repo "$GITHUB_REPOSITORY" \
-            --title "ResetMe ${GITHUB_REF_NAME#v}" \
+            --title "Fermata ${GITHUB_REF_NAME#v}" \
             --generate-notes $prerelease

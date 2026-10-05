@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Builds a release package for one runtime identifier (PRD §43-44):
-#   win-*   -> artifacts/package/resetme-<rid>.zip        (ResetMeApp.exe + resetme.exe side by side)
-#   linux-* -> artifacts/package/resetme-<rid>.tar.gz     (ResetMeApp + resetme + resetme.desktop)
-#   osx-*   -> artifacts/package/resetme-macos-<arch>.tar.gz containing ResetMe.app
-#              (menu bar app, LSUIElement; the `resetme` CLI lives in Contents/MacOS too)
+#   win-*   -> artifacts/package/fermata-<rid>.zip        (FermataApp.exe + fermata.exe side by side)
+#   linux-* -> artifacts/package/fermata-<rid>.tar.gz     (FermataApp + fermata + fermata.desktop)
+#   osx-*   -> artifacts/package/fermata-macos-<arch>.tar.gz containing Fermata.app
+#              (menu bar app, LSUIElement; the `fermata` CLI lives in Contents/MacOS too)
 # Usage: scripts/package.sh <rid> [version]
 set -euo pipefail
 rid="${1:?usage: package.sh <rid> [version]}"
-version="${2:-0.2.0}"
+version="${2:-0.5.0}"
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 out="$repo/artifacts/package"
 stage="$out/stage-$rid"
@@ -27,21 +27,21 @@ check_case_collisions() {
 
 case "$rid" in
   osx-*)
-    app="$stage/ResetMe.app"
+    app="$stage/Fermata.app"
     bin="$app/Contents/MacOS"
     mkdir -p "$bin" "$app/Contents/Resources"
-    publish ResetMe.Desktop "$bin"
-    publish ResetMe.Cli "$bin"
+    publish Fermata.Desktop "$bin"
+    publish Fermata.Cli "$bin"
     check_case_collisions "$bin"
     cat > "$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleName</key><string>ResetMe</string>
-    <key>CFBundleDisplayName</key><string>ResetMe</string>
-    <key>CFBundleIdentifier</key><string>com.resetme.app</string>
-    <key>CFBundleExecutable</key><string>ResetMeApp</string>
+    <key>CFBundleName</key><string>Fermata</string>
+    <key>CFBundleDisplayName</key><string>Fermata</string>
+    <key>CFBundleIdentifier</key><string>com.fermata.app</string>
+    <key>CFBundleExecutable</key><string>FermataApp</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>$version</string>
     <key>CFBundleVersion</key><string>$version</string>
@@ -51,37 +51,37 @@ case "$rid" in
 </dict>
 </plist>
 PLIST
-    chmod +x "$bin/ResetMeApp" "$bin/resetme"
-    archive="$out/resetme-macos-${rid#osx-}.tar.gz"
-    tar -czf "$archive" -C "$stage" ResetMe.app
+    chmod +x "$bin/FermataApp" "$bin/fermata"
+    archive="$out/fermata-macos-${rid#osx-}.tar.gz"
+    tar -czf "$archive" -C "$stage" Fermata.app
     ;;
   linux-*)
-    dir="$stage/resetme"
-    publish ResetMe.Desktop "$dir"
-    publish ResetMe.Cli "$dir"
+    dir="$stage/fermata"
+    publish Fermata.Desktop "$dir"
+    publish Fermata.Cli "$dir"
     check_case_collisions "$dir"
-    cat > "$dir/resetme.desktop" <<DESKTOP
+    cat > "$dir/fermata.desktop" <<DESKTOP
 [Desktop Entry]
 Type=Application
-Name=ResetMe
+Name=Fermata
 Comment=Codex usage limits and reset credits
-Exec=ResetMeApp
+Exec=FermataApp
 Terminal=false
 Categories=Development;Utility;
 DESKTOP
-    chmod +x "$dir/ResetMeApp" "$dir/resetme"
-    archive="$out/resetme-$rid.tar.gz"
-    tar -czf "$archive" -C "$stage" resetme
+    chmod +x "$dir/FermataApp" "$dir/fermata"
+    archive="$out/fermata-$rid.tar.gz"
+    tar -czf "$archive" -C "$stage" fermata
     ;;
   win-*)
-    dir="$stage/resetme"
-    publish ResetMe.Desktop "$dir"
-    publish ResetMe.Cli "$dir"
+    dir="$stage/fermata"
+    publish Fermata.Desktop "$dir"
+    publish Fermata.Cli "$dir"
     check_case_collisions "$dir"
-    archive="$out/resetme-$rid.zip"
+    archive="$out/fermata-$rid.zip"
     rm -f "$archive"
-    if command -v zip > /dev/null; then (cd "$stage" && zip -qr "$archive" resetme)
-    elif command -v 7z > /dev/null; then (cd "$stage" && 7z a -bd -bso0 "$archive" resetme)
+    if command -v zip > /dev/null; then (cd "$stage" && zip -qr "$archive" fermata)
+    elif command -v 7z > /dev/null; then (cd "$stage" && 7z a -bd -bso0 "$archive" fermata)
     else pwsh -NoProfile -Command "Compress-Archive -Path '$dir' -DestinationPath '$archive'"; fi
     ;;
   *) echo "unsupported rid: $rid" >&2; exit 2 ;;

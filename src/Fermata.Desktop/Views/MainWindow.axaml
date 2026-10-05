@@ -1,0 +1,212 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Fermata.Desktop.ViewModels"
+        xmlns:views="using:Fermata.Desktop.Views"
+        x:Class="Fermata.Desktop.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Title="Fermata"
+        Width="440" Height="680" MinWidth="380" MinHeight="520"
+        WindowStartupLocation="CenterScreen">
+
+  <Window.Styles>
+    <Style Selector="TextBlock.label">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="Opacity" Value="0.75" />
+    </Style>
+    <Style Selector="TextBlock.value">
+      <Setter Property="FontSize" Value="22" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="TextBlock.hint">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Opacity" Value="0.65" />
+    </Style>
+    <Style Selector="ProgressBar">
+      <Setter Property="Height" Value="8" />
+      <Setter Property="MinHeight" Value="8" />
+      <Setter Property="CornerRadius" Value="4" />
+    </Style>
+  </Window.Styles>
+
+  <ScrollViewer>
+    <StackPanel Margin="20" Spacing="16">
+
+      <!-- Status -->
+      <Border CornerRadius="8" Padding="14" Background="{DynamicResource ControlFillColorDefaultBrush}">
+        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
+          <Ellipse Grid.RowSpan="2" Width="12" Height="12" Margin="0,4,12,0" VerticalAlignment="Top"
+                   Fill="{Binding Health, Converter={x:Static views:HealthBrushConverter.Instance}}" />
+          <TextBlock Grid.Column="1" Text="{Binding StatusText}" FontSize="16" FontWeight="SemiBold" />
+          <TextBlock Grid.Column="1" Grid.Row="1" Classes="hint" TextWrapping="Wrap"
+                     Text="{Binding StatusDetail}" IsVisible="{Binding StatusDetail, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        </Grid>
+      </Border>
+
+      <!-- Update -->
+      <Border CornerRadius="8" Padding="14" BorderBrush="#2E9E5B" BorderThickness="1" IsVisible="{Binding UpdateAvailable}">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Classes="hint" Text="{Binding UpdateText}" TextWrapping="Wrap" VerticalAlignment="Center" />
+          <Button Grid.Column="1" Content="Install update" Margin="12,0,0,0" Command="{Binding InstallUpdateCommand}"
+                  IsVisible="{Binding CanInstallUpdate}" />
+        </Grid>
+      </Border>
+
+      <!-- Unresolved attempt -->
+      <Border CornerRadius="8" Padding="14" BorderBrush="#D99A1E" BorderThickness="1" IsVisible="{Binding HasPendingAttempt}">
+        <StackPanel Spacing="8">
+          <TextBlock Text="Reset needs attention" FontWeight="SemiBold" />
+          <TextBlock Classes="hint" TextWrapping="Wrap" Text="{Binding PendingText}" />
+          <Button Content="Finish pending reset" HorizontalAlignment="Right" Command="{Binding FinishPendingCommand}" />
+        </StackPanel>
+      </Border>
+
+      <!-- Usage -->
+      <StackPanel Spacing="6">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Classes="label" Text="5-hour window" />
+          <TextBlock Grid.Column="1" Classes="hint" Text="{Binding FiveHourResetText}" />
+        </Grid>
+        <Grid ColumnDefinitions="*,Auto">
+          <ProgressBar Value="{Binding FiveHourPercent}" Maximum="100" Foreground="{Binding FiveHourPercent, Converter={x:Static views:PercentBrushConverter.Instance}}" VerticalAlignment="Center" Margin="0,0,12,0" />
+          <TextBlock Grid.Column="1" Classes="value" Text="{Binding FiveHourText}" MinWidth="64" TextAlignment="Right" />
+        </Grid>
+        <TextBlock Classes="hint" Text="{Binding FiveHourDetailText}" />
+      </StackPanel>
+
+      <StackPanel Spacing="6">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Classes="label" Text="Weekly window" />
+          <TextBlock Grid.Column="1" Classes="hint" Text="{Binding WeeklyResetText}" />
+        </Grid>
+        <Grid ColumnDefinitions="*,Auto">
+          <ProgressBar Value="{Binding WeeklyPercent}" Maximum="100" Foreground="{Binding WeeklyPercent, Converter={x:Static views:PercentBrushConverter.Instance}}" VerticalAlignment="Center" Margin="0,0,12,0" />
+          <TextBlock Grid.Column="1" Classes="value" Text="{Binding WeeklyText}" MinWidth="64" TextAlignment="Right" />
+        </Grid>
+        <TextBlock Classes="hint" Text="{Binding WeeklyDetailText}" />
+      </StackPanel>
+
+      <Grid ColumnDefinitions="*,Auto">
+        <StackPanel>
+          <TextBlock Classes="label" Text="Reset credits" />
+          <TextBlock Classes="hint" Text="{Binding CreditExpiryText}" />
+        </StackPanel>
+        <TextBlock Grid.Column="1" Classes="value" Text="{Binding CreditsText}" VerticalAlignment="Center" />
+      </Grid>
+
+      <Grid ColumnDefinitions="*,Auto,Auto">
+        <TextBlock Classes="hint" Text="{Binding LastUpdatedText}" VerticalAlignment="Center" />
+        <Button Grid.Column="1" Content="Open logs" Command="{Binding OpenLogsCommand}" Margin="0,0,8,0" />
+        <Button Grid.Column="2" Content="Reset now…" Classes="accent" Command="{Binding ResetNowCommand}" />
+      </Grid>
+
+      <!-- Jobs -->
+      <StackPanel Spacing="8" IsVisible="{Binding HasJobs}">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Classes="label" Text="Jobs" />
+          <TextBlock Grid.Column="1" Classes="hint" Text="{Binding JobsSummary}" />
+        </Grid>
+        <ItemsControl ItemsSource="{Binding Jobs}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:JobRowViewModel">
+              <Border CornerRadius="6" Padding="10,8" Margin="0,0,0,6"
+                      Background="{DynamicResource ControlFillColorDefaultBrush}">
+                <StackPanel Spacing="3">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel>
+                      <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Classes="hint" Text="{Binding Summary}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                      <Button Content="Pause" Command="{Binding PauseCommand}" IsVisible="{Binding CanPause}" />
+                      <Button Content="Resume" Command="{Binding ResumeCommand}" IsVisible="{Binding CanResume}" />
+                    </StackPanel>
+                  </Grid>
+                  <TextBlock Classes="hint" Text="{Binding Reason}" TextWrapping="Wrap"
+                             IsVisible="{Binding Reason, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                  <TextBlock Classes="hint" Text="{Binding Objective}" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
+                  <SelectableTextBlock Classes="hint" Text="{Binding Attach}" FontFamily="Consolas,Menlo,monospace"
+                                       IsVisible="{Binding Attach, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                  <ItemsControl ItemsSource="{Binding Events}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="x:String">
+                        <TextBlock Classes="hint" Text="{Binding}" TextWrapping="Wrap" />
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <Button Content="Open Claude limit resets…" HorizontalAlignment="Left"
+                Command="{Binding OpenClaudeLimitResetsCommand}" IsVisible="{Binding ShowClaudeLimitResets}"
+                ToolTip.Tip="If you have a Claude reset credit, use it on claude.ai (Limit resets, then Reset for free). Fermata cannot redeem Claude credits itself." />
+      </StackPanel>
+
+      <!-- Settings -->
+      <Expander Header="Settings" HorizontalAlignment="Stretch">
+        <StackPanel Spacing="10">
+          <Grid ColumnDefinitions="*,160">
+            <TextBlock Text="Mode" VerticalAlignment="Center" />
+            <ComboBox Grid.Column="1" HorizontalAlignment="Stretch"
+                      ItemsSource="{x:Static vm:MainViewModel.ModeNames}" SelectedIndex="{Binding ModeIndex}" />
+          </Grid>
+          <TextBlock Classes="hint" TextWrapping="Wrap"
+                     Text="Confirm asks before using a credit. Automatic uses one without asking (daily/weekly caps apply). Manual only informs." />
+          <Grid ColumnDefinitions="*,160">
+            <TextBlock Text="Check every (seconds)" VerticalAlignment="Center" />
+            <NumericUpDown Grid.Column="1" Minimum="10" Maximum="3600" Increment="5" FormatString="0"
+                           Value="{Binding IntervalSeconds}" />
+          </Grid>
+          <Grid ColumnDefinitions="*,160">
+            <TextBlock Text="Skip if limit lifts within (min)" VerticalAlignment="Center" TextWrapping="Wrap" />
+            <NumericUpDown Grid.Column="1" Minimum="0" Maximum="600" Increment="5" FormatString="0"
+                           Value="{Binding MinNaturalResetMinutes}" />
+          </Grid>
+          <CheckBox Content="Desktop notifications" IsChecked="{Binding NotificationsEnabled}" />
+          <CheckBox Content="{Binding NearLimitLabel}" IsChecked="{Binding NearLimitEnabled}" />
+          <CheckBox Content="Start Fermata at login" IsChecked="{Binding StartAtLogin}" />
+          <CheckBox Content="Start hidden in the tray / menu bar" IsChecked="{Binding StartMinimized}" />
+          <CheckBox IsChecked="{Binding ContinueAfterReset}"
+                    ToolTip.Tip="After a reset, Codex goals (/goal) that stopped at the usage limit are set back to active, so unattended work continues.">
+            <TextBlock Text="After a reset, continue Codex goals that stopped at the limit" TextWrapping="Wrap" />
+          </CheckBox>
+          <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+            <StackPanel>
+              <TextBlock Text="Codex integration" />
+              <TextBlock Classes="hint" Text="{Binding CodexHooksText}" TextWrapping="Wrap" />
+            </StackPanel>
+            <Button Grid.Column="1" Content="{Binding CodexHooksButtonText}" Command="{Binding ToggleCodexHooksCommand}"
+                    VerticalAlignment="Center" Margin="12,0,0,0" />
+          </Grid>
+          <Grid ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Text="Claude Code integration" />
+              <TextBlock Classes="hint" Text="{Binding ClaudeIntegrationText}" TextWrapping="Wrap" />
+            </StackPanel>
+            <Button Grid.Column="1" Content="{Binding ClaudeIntegrationButtonText}" Command="{Binding ToggleClaudeIntegrationCommand}"
+                    VerticalAlignment="Center" Margin="12,0,0,0" />
+          </Grid>
+          <Grid ColumnDefinitions="*,Auto,Auto">
+            <TextBlock Classes="hint" Text="{Binding SettingsMessage}" VerticalAlignment="Center" TextWrapping="Wrap" />
+            <Button Grid.Column="1" Content="Export diagnostics" Command="{Binding ExportDiagnosticsCommand}" Margin="0,0,8,0" />
+            <Button Grid.Column="2" Content="Save" Command="{Binding SaveSettingsCommand}" />
+          </Grid>
+        </StackPanel>
+      </Expander>
+
+      <!-- Events -->
+      <StackPanel Spacing="6">
+        <TextBlock Classes="label" Text="Recent events" />
+        <ItemsControl ItemsSource="{Binding Events}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="x:String">
+              <TextBlock Classes="hint" Text="{Binding}" TextWrapping="Wrap" Margin="0,2" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+
+    </StackPanel>
+  </ScrollViewer>
+</Window>

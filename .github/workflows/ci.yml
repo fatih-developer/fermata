@@ -50,17 +50,17 @@ jobs:
           mkdir smoke && cd smoke
           case "${{ matrix.rid }}" in
             win-*)
-              unzip -q ../artifacts/package/resetme-${{ matrix.rid }}.zip
-              cli=resetme/resetme.exe; app=resetme/ResetMeApp.exe
+              unzip -q ../artifacts/package/fermata-${{ matrix.rid }}.zip
+              cli=fermata/fermata.exe; app=fermata/FermataApp.exe
               fake="$(cygpath -m "$GITHUB_WORKSPACE/scripts/fake-codex/codex.cmd")" ;;
             osx-*)
-              tar -xzf ../artifacts/package/resetme-macos-arm64.tar.gz
-              plutil -lint ResetMe.app/Contents/Info.plist
-              cli=ResetMe.app/Contents/MacOS/resetme; app=ResetMe.app/Contents/MacOS/ResetMeApp
+              tar -xzf ../artifacts/package/fermata-macos-arm64.tar.gz
+              plutil -lint Fermata.app/Contents/Info.plist
+              cli=Fermata.app/Contents/MacOS/fermata; app=Fermata.app/Contents/MacOS/FermataApp
               fake="$GITHUB_WORKSPACE/scripts/fake-codex/codex" ;;
             linux-*)
-              tar -xzf ../artifacts/package/resetme-${{ matrix.rid }}.tar.gz
-              cli=resetme/resetme; app=resetme/ResetMeApp
+              tar -xzf ../artifacts/package/fermata-${{ matrix.rid }}.tar.gz
+              cli=fermata/fermata; app=fermata/FermataApp
               fake="$GITHUB_WORKSPACE/scripts/fake-codex/codex" ;;
           esac
 
@@ -68,9 +68,9 @@ jobs:
           "$cli" --version
           "$cli" autostart
 
-          export RESETME_HOME="$PWD/home" FAKE_CODEX_STATE="$PWD/fake-state.json" FAKE_CODEX_LOG="$PWD/consume.log"
-          mkdir -p "$RESETME_HOME"
-          printf 'mode = "automatic"\n[notifications]\nenabled = false\n[reset]\nverify_after_seconds = 0\n[codex]\nexecutable = "%s"\n' "$fake" > "$RESETME_HOME/config.toml"
+          export FERMATA_HOME="$PWD/home" FAKE_CODEX_STATE="$PWD/fake-state.json" FAKE_CODEX_LOG="$PWD/consume.log"
+          mkdir -p "$FERMATA_HOME"
+          printf 'mode = "automatic"\n[notifications]\nenabled = false\n[reset]\nverify_after_seconds = 0\n[codex]\nexecutable = "%s"\n' "$fake" > "$FERMATA_HOME/config.toml"
 
           "$cli" daemon > daemon.out 2>&1 &
           pid=$!
@@ -90,6 +90,6 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: resetme-${{ matrix.rid }}
-          path: artifacts/package/resetme-*
+          name: fermata-${{ matrix.rid }}
+          path: artifacts/package/fermata-*
           if-no-files-found: error

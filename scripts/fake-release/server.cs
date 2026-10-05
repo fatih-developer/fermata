@@ -1,4 +1,4 @@
-// Fake GitHub release feed for testing `resetme update` without publishing a release.
+// Fake GitHub release feed for testing `fermata update` without publishing a release.
 //   dotnet run scripts/fake-release/server.cs -- <asset-dir> <port> <tag>
 // GET /releases/latest  -> GitHub-shaped JSON listing every file in <asset-dir> as an asset
 // GET /<file>           -> the file itself

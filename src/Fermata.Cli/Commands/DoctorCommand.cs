@@ -1,0 +1,218 @@
+using Fermata.Codex.AppServer;
+using Fermata.Core.Ports;
+using Fermata.Platform;
+
+namespace Fermata.Cli.Commands;
+
+/// <summary>Installation and connectivity checks (PRD FR-10).</summary>
+internal static class DoctorCommand
+{
+    /// <summary>Versions the app-server protocol mapping was verified against.</summary>
+    private const string TestedCodexVersionPrefix = "0.159.";
+
+    private enum Level
+    {
+        Ok,
+        Warn,
+        Fail,
+        Skip,
+    }
+
+    public static async Task<int> RunAsync(bool sendTestNotification, CancellationToken cancellationToken)
+    {
+        var failures = 0;
+        void Report(Level level, string check, string detail = "")
+        {
+            if (level == Level.Fail)
+            {
+                failures++;
+            }
+
+            var tag = level switch
+            {
+                Level.Ok => "[ ok ]",
+                Level.Warn => "[warn]",
+                Level.Fail => "[FAIL]",
+                _ => "[skip]",
+            };
+            Console.WriteLine(detail.Length == 0 ? $"{tag} {check}" : $"{tag} {check}: {detail}");
+        }
+
+        // Local setup.
+        var paths = AppPaths.Default();
+        paths.EnsureRoot();
+        Report(Level.Ok, "Data directory", paths.Root);
+        Report(
+            FilePermissions.IsRestricted(paths.Root, isDirectory: true) ? Level.Ok : Level.Warn,
+            "Data directory permissions",
+            FilePermissions.IsRestricted(paths.Root, isDirectory: true) ? "current user only" : "accessible by other users");
+
+        var configStore = new TomlConfigStore(paths.ConfigFile);
+        ConfigLoadResult? config = null;
+        try
+        {
+            config = configStore.Load();
+            Report(config.Warnings.Count == 0 ? Level.Ok : Level.Warn, "Config",
+                config.FileExists ? string.Join("; ", config.Warnings.DefaultIfEmpty(paths.ConfigFile)) : "no config.toml, using defaults (`fermata config --init`)");
+        }
+        catch (Exception ex) when (ex is IOException or Tomlyn.TomlException or UnauthorizedAccessException)
+        {
+            Report(Level.Fail, "Config", ex.Message);
+        }
+
+        try
+        {
+            var stateStore = new JsonResetStateStore(paths.StateFile);
+            var state = stateStore.Load();
+            Report(state.Pending is null ? Level.Ok : Level.Warn, "State",
+                state.Pending is null ? "no unresolved reset attempt" : "unresolved reset attempt; run `fermata reset`");
+            if (stateStore.LastLoadWarning is { } warning)
+            {
+                Report(Level.Warn, "State file", warning);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or System.Text.Json.JsonException)
+        {
+            Report(Level.Fail, "State", ex.Message);
+        }
+
+        try
+        {
+            Directory.CreateDirectory(paths.LogDirectory);
+            var probe = Path.Combine(paths.LogDirectory, ".write-test");
+            File.WriteAllText(probe, "");
+            File.Delete(probe);
+            Report(Level.Ok, "Log directory", $"{paths.LogDirectory} (level {config?.Options.Logging.Level.ToString().ToLowerInvariant() ?? "information"})");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Report(Level.Warn, "Log directory", $"not writable: {ex.Message}");
+        }
+
+        using (var handle = new FileResetLock(paths.LockFile).TryAcquire())
+        {
+            Report(handle is null ? Level.Warn : Level.Ok, "Reset lock",
+                handle is null ? "held by another Fermata process" : "free");
+        }
+
+        // Jobs.
+        var checkpoints = new Platform.Jobs.CheckpointWriter();
+        Report(checkpoints.GitAvailable ? Level.Ok : Level.Warn, "git", checkpoints.GitAvailable ? "found (checkpoints record branch, HEAD and changes)" : "not found: checkpoints and the workspace check are skipped");
+        var jobStore = new Platform.Jobs.JsonJobStore(paths.JobsDirectory);
+        var jobs = jobStore.List();
+        var blocked = jobs.Count(j => j.Status is Core.Jobs.JobStatus.BlockedApproval or Core.Jobs.JobStatus.BlockedUser or Core.Jobs.JobStatus.BlockedWorkspace);
+        Report(blocked == 0 ? Level.Ok : Level.Warn, "Jobs",
+            $"{jobs.Count(j => !j.IsFinished)} open, {blocked} need you (`fermata jobs`)");
+        using (var handle = new FileResetLock(paths.JobsLockFile).TryAcquire())
+        {
+            var open = jobs.Any(j => !j.IsFinished);
+            Report(handle is null || !open ? Level.Ok : Level.Warn, "Job scheduler",
+                handle is null ? "running (Fermata app or `fermata daemon`)" : open ? "not running: open jobs are not watched; start the Fermata app or `fermata daemon`" : "not running (no open jobs)");
+        }
+
+        // Claude Code.
+        var claudeExecutable = Claude.ClaudeLocator.Resolve(config?.Options.Jobs.Claude.Executable);
+        Report(claudeExecutable is null ? Level.Skip : Level.Ok, "Claude Code", claudeExecutable ?? "not found (only needed for Claude jobs)");
+        if (claudeExecutable is not null)
+        {
+            try
+            {
+                var claudeStatus = new Claude.ClaudeSettingsInstaller(Claude.ClaudeSettingsInstaller.DefaultClaudeHome(), new Claude.ClaudeStateStore(paths)).GetStatus();
+                Report(claudeStatus.Installed && claudeStatus.StatusLineWrapped && claudeStatus.ExecutableExists ? Level.Ok : Level.Warn, "Claude integration",
+                    !claudeStatus.Installed ? "not installed (`fermata claude install`)"
+                    : !claudeStatus.ExecutableExists ? "points to a missing fermata; run `fermata claude install` again"
+                    : $"status line {(claudeStatus.StatusLineWrapped ? "wrapped" : "NOT wrapped")}, hooks: {string.Join(", ", claudeStatus.HookEvents)}");
+            }
+            catch (Exception ex) when (ex is IOException or InvalidDataException or System.Text.Json.JsonException)
+            {
+                Report(Level.Warn, "Claude integration", $"cannot read Claude settings: {ex.Message}");
+            }
+        }
+
+        // Codex.
+        var configured = config?.Options.CodexExecutable;
+        var executable = CodexLocator.Resolve(configured);
+        if (executable is null)
+        {
+            Report(Level.Fail, "Codex executable", "not found (install Codex or set [codex] executable)");
+            return Finish(failures);
+        }
+
+        Report(Level.Ok, "Codex executable", executable);
+
+        CodexAppServerClient client;
+        try
+        {
+            client = await CodexAppServerClient.StartAsync(
+                new CodexClientOptions { Executable = configured },
+                TimeProvider.System,
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (CodexUnavailableException ex)
+        {
+            Report(Level.Fail, "Codex App Server", ex.Message);
+            return Finish(failures);
+        }
+
+        await using (client)
+        {
+            var version = client.CodexVersion ?? "unknown";
+            Report(Level.Ok, "Codex App Server", "initialize succeeded");
+            Report(version.StartsWith(TestedCodexVersionPrefix, StringComparison.Ordinal) ? Level.Ok : Level.Warn,
+                "Codex version", version.StartsWith(TestedCodexVersionPrefix, StringComparison.Ordinal)
+                    ? version
+                    : $"{version} (verified against {TestedCodexVersionPrefix}x; protocol may differ)");
+
+            try
+            {
+                var account = await client.GetAccountAsync(cancellationToken).ConfigureAwait(false);
+                if (!account.IsAuthenticated)
+                {
+                    Report(Level.Fail, "Authentication", "not logged in (`codex login`)");
+                    return Finish(failures);
+                }
+
+                Report(Level.Ok, "Authentication", $"{account.AccountType ?? "unknown"} / plan {account.PlanType ?? "unknown"}");
+
+                var usage = await client.GetUsageAsync(includeCreditDetails: false, cancellationToken).ConfigureAwait(false);
+                var windows = usage.FiveHour is not null && usage.Weekly is not null;
+                Report(windows ? Level.Ok : Level.Warn, "Rate limits",
+                    windows ? "5-hour and weekly windows readable" : "one or both windows missing from the response");
+                Report(usage.UsageAllowed is null ? Level.Warn : Level.Ok, "Usage permission flag",
+                    usage.UsageAllowed is null ? "not reported; detection falls back to percentages" : "reported");
+                Report(usage.ResetCreditsReported ? Level.Ok : Level.Fail, "Reset capability",
+                    usage.ResetCreditsReported ? $"{usage.AvailableResetCount} credit(s) available" : "backend sent no reset-credit data");
+            }
+            catch (Exception ex) when (ex is CodexTransientException or Codex.JsonRpc.JsonRpcException or CodexProtocolException)
+            {
+                Report(Level.Fail, "Codex request", ex.Message);
+            }
+        }
+
+        var notifier = Platform.Notifications.NotifierFactory.Create(config?.Options.NotificationsEnabled ?? true);
+        Report(notifier.IsAvailable ? Level.Ok : Level.Warn, "Desktop notifications",
+            notifier.IsAvailable ? notifier.Mechanism : $"{notifier.Mechanism}; terminal and log are used instead");
+        if (sendTestNotification && notifier.IsAvailable)
+        {
+            var shown = await notifier.ShowAsync(
+                new Core.Ports.Notification(Core.Ports.NotificationKind.Info, "Fermata test", "Notifications work."),
+                cancellationToken).ConfigureAwait(false);
+            Report(shown ? Level.Ok : Level.Fail, "Test notification", shown ? "sent" : "the notification helper failed");
+        }
+
+        var autostart = Platform.Autostart.AutostartFactory.Create();
+        foreach (var target in new[] { Platform.Autostart.AutostartTarget.Desktop, Platform.Autostart.AutostartTarget.Daemon })
+        {
+            var status = autostart.GetStatus(target);
+            Report(Level.Ok, $"Autostart ({target.ToString().ToLowerInvariant()})", $"{(status.Enabled ? "enabled" : "disabled")} via {status.Mechanism}");
+        }
+        return Finish(failures);
+    }
+
+    private static int Finish(int failures)
+    {
+        Console.WriteLine();
+        Console.WriteLine(failures == 0 ? "All checks passed." : $"{failures} check(s) failed.");
+        return failures == 0 ? ExitCodes.Ok : ExitCodes.Error;
+    }
+}

@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>fermata</AssemblyName>
+    <RootNamespace>Fermata.Cli</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Fermata.Core\Fermata.Core.csproj" />
+    <ProjectReference Include="..\Fermata.Claude\Fermata.Claude.csproj" />
+    <ProjectReference Include="..\Fermata.Codex\Fermata.Codex.csproj" />
+    <ProjectReference Include="..\Fermata.Platform\Fermata.Platform.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.12" />
+    <PackageReference Include="System.CommandLine" Version="2.0.12" />
+  </ItemGroup>
+
+</Project>

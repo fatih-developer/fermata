@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Fermata.Claude</RootNamespace>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Fermata.Core\Fermata.Core.csproj" />
+    <ProjectReference Include="..\Fermata.Platform\Fermata.Platform.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Fermata.Core.Tests" />
+  </ItemGroup>
+
+</Project>

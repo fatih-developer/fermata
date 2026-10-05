@@ -43,7 +43,7 @@ codex app-server daemon start|stop|version
 
 ```jsonc
 → {"jsonrpc":"2.0","id":1,"method":"initialize","params":{
-     "clientInfo":{"name":"resetme","title":null,"version":"x.y.z"},
+     "clientInfo":{"name":"fermata","title":null,"version":"x.y.z"},
      "capabilities":{"experimentalApi":false,"requestAttestation":false}}}
 ← {"id":1,"result":{"userAgent":"...","codexHome":"C:\\Users\\<user>\\.codex",
      "platformFamily":"windows","platformOs":"windows"}}
@@ -54,7 +54,7 @@ Başlatmadan hemen sonra sunucu kendiliğinden `account/updated` (authMode, plan
 
 ### Lifecycle kararı (MVP-1)
 
-ResetMe **kendi `codex app-server` child process'ini stdio üzerinden başlatır**. Gerekçeler:
+Fermata **kendi `codex app-server` child process'ini stdio üzerinden başlatır**. Gerekçeler:
 
 - Ek kurulum veya daemon gerektirmez, her üç platformda aynı şekilde çalışır.
 - Auth, `codexHome` (`~/.codex`) üzerinden paylaşılır; ayrı login gerekmez.
@@ -169,7 +169,7 @@ result: { outcome: "reset" | "nothingToReset" | "noCredit" | "alreadyRedeemed" }
 
 ### Kredi seçimi
 
-`creditId` boş bırakılabilir. Ancak krediler süreli olduğu için ResetMe `status == "available"` olan krediler arasından **`expiresAt` değeri en yakın olanı** açıkça seçer. Süresi dolmak üzere olan kredi önce kullanılır.
+`creditId` boş bırakılabilir. Ancak krediler süreli olduğu için Fermata `status == "available"` olan krediler arasından **`expiresAt` değeri en yakın olanı** açıkça seçer. Süresi dolmak üzere olan kredi önce kullanılır.
 
 ---
 
@@ -193,7 +193,7 @@ Bu konular ancak gerçek bir limit olayında ve gerçek kredi tüketimiyle doğr
 4. Ayrı bir Codex sürecindeki kullanımın bu instance'a `account/rateLimits/updated` olarak gelip gelmediği.
 5. Polling sıklığının sunucu tarafında bir rate limit'e takılıp takılmadığı.
 
-**Öneri:** 1–3 numaralı maddeler, ilk gerçek limit olayında `resetme reset --verbose` ile kontrollü olarak gözlenip bu dokümana eklenmeli.
+**Öneri:** 1–3 numaralı maddeler, ilk gerçek limit olayında `fermata reset --verbose` ile kontrollü olarak gözlenip bu dokümana eklenmeli.
 
 ---
 
@@ -201,3 +201,36 @@ Bu konular ancak gerçek bir limit olayında ve gerçek kredi tüketimiyle doğr
 
 - `app-server` komut grubu `[experimental]` olduğu için protokol değişebilir. Adapter, `generate-json-schema` çıktısını CI'da snapshot olarak karşılaştırmalıdır. Böylece upstream değişiklik erken yakalanır.
 - `doctor` komutu, `codex --version` sonucunu test edilmiş sürüm aralığıyla karşılaştırıp uyarı vermelidir.
+
+---
+
+## 9. Codex içi entegrasyon (2026-10-04, `codex-cli 0.160.0`)
+
+Probe: `scripts/probe-daemon-threads.mjs` (salt okunur). Aşağıdakiler canlı doğrulandı.
+
+### Hook'lar
+
+- Kullanıcı düzeyi: `$CODEX_HOME/hooks.json`, biçim `{"hooks": {"<Event>": [{"matcher"?, "hooks": [{"type": "command", "command", "timeout", "statusMessage"?}]}]}}`. `config.toml` içinde `[[hooks.<Event>]]` olarak da yazılabilir. Codex'in gördüğü hook'lar `hooks/list` (app-server) ile model çağrısı olmadan listelenebilir.
+- Yeni hook'lar `trustStatus: "untrusted"` gelir. TUI açılışta onay ister ("Trust all and continue"). `--dangerously-bypass-hook-trust` yalnızca testler içindir.
+- **Windows'ta komut PowerShell ile çalışır.** Tırnaklı bir yol PowerShell'de string sayılır, bu yüzden komut `& '<yol>' hook <event>` biçiminde olmalıdır (tek tırnaklar ikilenir). Diğer platformlarda `'<yol>' hook <event>` (sh).
+- Girdi (stdin): `session_id`, `turn_id`, `transcript_path`, `cwd`, `hook_event_name`, `model`, `permission_mode`, `prompt` (UserPromptSubmit).
+- Çıktı: Claude uyumlu (`continue`, `decision: "block"` + `reason`, `systemMessage`, `hookSpecificOutput.additionalContext`). Fermata yalnızca `systemMessage` kullanır, asla bloklamaz.
+- Hook çıktıları app-server'da `HookCompletedNotification.entries` (`kind`, `text`) olarak görünür. `codex exec` bunları basmaz.
+
+### Paylaşılan daemon ve goal'ler
+
+- TUI oturumları `codex app-server daemon` üzerinde çalışır. Kontrol soketi: `$CODEX_HOME/app-server-control/app-server-control.sock` (Windows'ta da AF_UNIX; dosya bir reparse point'tir). Soket **WebSocket** konuşur (HTTP Upgrade, her text mesajı bir JSON-RPC mesajı). `codex app-server proxy` aynı baytları stdio'ya köprüler.
+- `thread/loaded/list`, canlı oturumları verir. `thread/goal/get|set`, stable şemadadır. Goal durumları: `active`, `paused`, `blocked`, `usageLimited`, `budgetLimited`, `complete`.
+- Doğrulandı (geçersiz model adıyla, 0 token): `usageLimited` bir goal `thread/goal/set {status: "active"}` ile tekrar etkin yapılınca daemon **turu kendisi başlatır** (`turn/started`). Fermata bu yüzden turu kendisi başlatmaz (`turn/start` yok). Böylece onay istekleri kullanıcının istemcisine gider.
+- Geçici (ephemeral) thread'lerde goal yoktur (`-32600`). Bu thread'ler atlanır.
+- Goal'süz oturumlarda son turun `status: "failed"` ve `error.codexErrorInfo: "usageLimitExceeded"` olması "limitte durdu" anlamına gelir. Bu oturumlara yalnızca bildirim gönderilir. `thread/queue/*` deneysel olduğu için kullanılmaz.
+
+### MCP
+
+- `codex mcp add fermata -- <fermata> mcp`, `[mcp_servers.fermata]` yazar. `mcpServerStatus/list` sunucunun araçlarını gösterir.
+- Codex MCP sunucularına ortamı filtreleyerek geçirir. Framework-dependent (debug) bir `fermata` `DOTNET_ROOT` olmadan açılamaz. Release paketleri self-contained olduğu için etkilenmez.
+
+### Hâlâ doğrulanmamış
+
+1. Gerçek bir limit olayında Codex'in goal'ü gerçekten `usageLimited` yapıp yapmadığı (şema ve enum bunu öngörüyor).
+2. Codex Desktop uygulamasının oturumlarının aynı daemon'da çalışıp çalışmadığı ve `hooks.json`'u okuyup okumadığı. `fermata codex status`, daemon'daki canlı oturum sayısını gösterir.

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# End-to-end test of `resetme update` against a fake release feed:
+# End-to-end test of `fermata update` against a fake release feed:
 #   1. build and install an old package (0.0.1-e2e),
 #   2. serve a newer package + SHA256SUMS.txt from scripts/fake-release/server.cs,
-#   3. run the OLD installed `resetme update --yes`,
+#   3. run the OLD installed `fermata update --yes`,
 #   4. wait until the install folder runs the new version.
 # Usage: scripts/update-e2e.sh <rid> <new-version>
 set -euo pipefail
@@ -31,9 +31,9 @@ case "$pkg_name" in
   *)     tar -xzf "$work/old/$pkg_name" -C "$work/install" ;;
 esac
 case "$rid" in
-  osx-*) cli="$work/install/ResetMe.app/Contents/MacOS/resetme" ;;
-  win-*) cli="$work/install/resetme/resetme.exe" ;;
-  *)     cli="$work/install/resetme/resetme" ;;
+  osx-*) cli="$work/install/Fermata.app/Contents/MacOS/fermata" ;;
+  win-*) cli="$work/install/fermata/fermata.exe" ;;
+  *)     cli="$work/install/fermata/fermata" ;;
 esac
 "$cli" --version | grep -q "$old_version"
 
@@ -47,11 +47,11 @@ for _ in $(seq 1 180); do
 done
 curl -sf "http://localhost:$port/releases/latest" > /dev/null || { echo "fake feed did not start:" >&2; cat "$work/server.log" >&2; exit 1; }
 
-export RESETME_UPDATE_FEED="http://localhost:$port/releases/latest"
-export RESETME_HOME="$work/home"
-echo "== resetme update --check"
+export FERMATA_UPDATE_FEED="http://localhost:$port/releases/latest"
+export FERMATA_HOME="$work/home"
+echo "== fermata update --check"
 "$cli" update --check
-echo "== resetme update --yes"
+echo "== fermata update --yes"
 "$cli" update --yes
 
 # Windows finishes the swap in a helper after the command exits.

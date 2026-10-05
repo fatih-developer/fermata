@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <AnalysisLevel>latest</AnalysisLevel>
-    <Version>0.3.0</Version>
-    <Authors>ResetMe</Authors>
+    <Version>0.5.0</Version>
+    <Authors>Fermata</Authors>
   </PropertyGroup>
 </Project>

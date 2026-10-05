@@ -1,7 +1,7 @@
-// Fake `codex app-server` for end-to-end testing ResetMe without spending real reset credits.
+// Fake `codex app-server` for end-to-end testing Fermata without spending real reset credits.
 // The account starts rate-limited (5-hour window at 100%) with 2 credits; a consume clears it.
 //
-// Point ResetMe at it with config.toml:
+// Point Fermata at it with config.toml:
 //   [codex]
 //   executable = "<repo>/scripts/fake-codex/codex.cmd"   (Windows)  or  ".../codex" (macOS/Linux)
 //
