@@ -62,17 +62,16 @@ It also starts jobs later (`--at 07:30`, `--in 2h`), picks up jobs after a reboo
 ```mermaid
 stateDiagram-v2
     direction LR
-    [*] --> Scheduled: fermata run --at / --in
+    [*] --> Scheduled: fermata run with a start time
     [*] --> Running: fermata run / adopt
     Scheduled --> Running: start time (quota allows)
     Scheduled --> WaitingQuota: start time during a limit
-    Running --> Running: 10% left → handoff note
-    Running --> Checkpointing: 5% left → stop after this turn
+    Running --> Checkpointing: 5% left, stop after this turn
     Checkpointing --> WaitingQuota: turn ended → checkpoint
     Running --> WaitingQuota: stopped at the limit → checkpoint
     WaitingQuota --> Running: reset + grace (or credit used) → resume
     WaitingQuota --> BlockedWorkspace: branch/HEAD moved
-    BlockedWorkspace --> Running: fermata resume --force
+    BlockedWorkspace --> Running: fermata resume (forced)
     Running --> BlockedApproval: approval needed
     Running --> BlockedUser: question asked
     BlockedApproval --> Running
@@ -87,24 +86,22 @@ All of these decisions come from one pure function, `JobPolicy.Decide(job, conte
 
 ```mermaid
 flowchart LR
-    subgraph agents[Agent CLIs]
-      CX[Codex app-server daemon]
-      CC[Claude Code]
+    subgraph agents["Agent CLIs"]
+      CX["Codex app-server daemon"]
+      CC["Claude Code"]
     end
-    subgraph fermata[Fermata]
-      SCH[JobScheduler<br/>tray app or fermata daemon]
-      POL[JobPolicy<br/>pure decisions]
-      CP[CheckpointWriter<br/>git]
-      ST[(jobs/&lt;id&gt;/job.json<br/>events.ndjson<br/>checkpoints/)]
+    subgraph fermata["Fermata"]
+      SCH["JobScheduler<br/>tray app or fermata daemon"]
+      POL["JobPolicy<br/>pure decisions"]
+      CP["CheckpointWriter<br/>git"]
+      ST[("jobs/&lt;id&gt;/job.json<br/>events.ndjson<br/>checkpoints/")]
     end
-    CX -- thread/goal status --> SCH
-    CC -- hooks + status line + claude agents --json --> SCH
+    CX <-->|"reads thread and goal status<br/>sets the goal active or paused"| SCH
+    CC <-->|"reads hooks, status line, claude agents<br/>runs claude --bg and --bg --resume"| SCH
     SCH --> POL --> SCH
     SCH --> CP --> ST
     SCH --> ST
-    SCH -- goal active/paused --> CX
-    SCH -- claude --bg / --bg --resume --> CC
-    CLI[fermata CLI] -- requests --> ST
+    CLI["fermata CLI"] -->|"requests"| ST
 ```
 
 **Quota levels.** Fermata looks at the fullest window:

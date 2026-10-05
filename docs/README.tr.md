@@ -53,17 +53,16 @@ Nasıl çalışır:
 ```mermaid
 stateDiagram-v2
     direction LR
-    [*] --> Scheduled: fermata run --at / --in
+    [*] --> Scheduled: başlangıç zamanlı fermata run
     [*] --> Running: fermata run / adopt
     Scheduled --> Running: başlangıç zamanı (kota uygun)
     Scheduled --> WaitingQuota: başlangıç zamanı limitte
-    Running --> Running: %10 kaldı → handoff notu
-    Running --> Checkpointing: %5 kaldı → tur sonunda dur
+    Running --> Checkpointing: %5 kaldı, tur sonunda dur
     Checkpointing --> WaitingQuota: tur bitti → checkpoint
     Running --> WaitingQuota: limitte durdu → checkpoint
     WaitingQuota --> Running: reset + grace (ya da kredi) → devam
     WaitingQuota --> BlockedWorkspace: branch/HEAD değişti
-    BlockedWorkspace --> Running: fermata resume --force
+    BlockedWorkspace --> Running: fermata resume (zorla)
     Running --> BlockedApproval: onay gerekiyor
     Running --> BlockedUser: soru soruldu
     BlockedApproval --> Running
