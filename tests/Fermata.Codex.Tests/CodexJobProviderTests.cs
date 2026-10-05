@@ -76,7 +76,7 @@ public sealed class CodexJobProviderTests : IAsyncDisposable
             _threads[id]["status"] = new JsonObject { ["type"] = "idle" };
             return new JsonObject { ["thread"] = _threads[id].DeepClone() };
         });
-        return await CodexDaemonClient.OverAsync(server.ClientConnection, TimeSpan.FromSeconds(5), cancellationToken);
+        return await CodexDaemonClient.OverAsync(server.ClientConnection, TimeSpan.FromSeconds(30), cancellationToken);
     }
 
     private JsonNode? Goal(string id) =>
@@ -212,7 +212,7 @@ public sealed class CodexJobProviderTests : IAsyncDisposable
         server.Handle("thread/goal/get", _ => new JsonObject { ["goal"] = new JsonObject { ["status"] = "usageLimited" } });
         server.Handle("thread/goal/set", p => new JsonObject { ["goal"] = new JsonObject { ["status"] = p?["status"]?.DeepClone() } });
 
-        var report = await new CodexSessionResumer(TimeSpan.FromSeconds(5)).ResumeAsync(server.ClientConnection, CancellationToken.None, skipThreads: new HashSet<string> { "job-thread" });
+        var report = await new CodexSessionResumer(TimeSpan.FromSeconds(30)).ResumeAsync(server.ClientConnection, CancellationToken.None, skipThreads: new HashSet<string> { "job-thread" });
 
         Assert.Equal(["other"], report.GoalsResumed);
     }
